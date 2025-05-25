@@ -1,0 +1,25 @@
+# Minimal Niuv Configuration File
+# Most test settings have been moved to nim-testkit defaults
+
+[tool.niuv]
+# Core configuration only
+nim_version = "2.0.0"
+nimble_dir = ".niuv/deps"
+lockfile = "nimble.lock"
+auto_lock = true
+
+# Minimal testing configuration
+[tool.niuv.testing]
+# Only specify what differs from defaults
+backend = "niuv"  # or "testkit" if using nim-testkit
+
+# All other test configurations are now handled by nim-testkit defaults:
+# - pattern: "test_*.nim"
+# - output_dir: "build/test_output"
+# - fail_fast: false
+# - coverage_threshold: 80.0
+# - etc.
+
+# Override only if needed
+# output_dir = "custom/test/output"
+# pattern = "spec_*.nim"

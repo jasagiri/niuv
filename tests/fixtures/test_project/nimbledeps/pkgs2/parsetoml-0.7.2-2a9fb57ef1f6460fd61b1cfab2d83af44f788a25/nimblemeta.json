@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "metaData": {
+    "url": "https://github.com/NimParsers/parsetoml.git",
+    "downloadMethod": "git",
+    "vcsRevision": "d297f5a81be2472905d367aa675dcbbca6e7a5d2",
+    "files": [
+      "/parsetoml.nimble",
+      "/parsetoml.nim"
+    ],
+    "binaries": [],
+    "specialVersions": [
+      "0.7.2"
+    ]
+  }
+}

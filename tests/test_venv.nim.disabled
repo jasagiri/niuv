@@ -1,0 +1,261 @@
+import std/[unittest, os, sequtils, strutils, times, json, tables]
+import results
+import ../src/[venv, config, utils, cleanup]
+import ./testutils
+
+suite "Virtual Environment Tests":
+  setup:
+    initTestEnvironment()
+
+    let testDir = getTempDir() / "niuv_test_venv_" & $epochTime()
+    # テスト用の設定を適用
+    setTestConfig(NiuvConfig(
+      venvDir: testDir,
+      nimbleLocalPath: "nimbledeps/pkgs",
+      parallelJobs: 4
+    ))
+    if dirExists(testDir):
+      removeDir(testDir)
+    createDir(testDir)
+
+  teardown:
+    cleanupTestEnvironment()
+
+    if dirExists(testDir):
+      try:
+        removeDir(testDir)
+      except CatchableError:
+        echo "Warning: Failed to cleanup test dir: " & testDir
+
+    # テスト終了時に、テスト過程で作成された環境を削除
+    # テスト用の環境名に対応するパターンで特定して削除
+    let currentTime = epochTime()
+    let intPart = int(currentTime)
+    let fracPart = currentTime - float(intPart)
+    let tmpEnvNames = @[
+      "test_env", "nim_version_test", "default_nim_test", "duplicate_test",
+      "active_env_" & $intPart,
+      "env1_" & $intPart,
+      "env2_" & $intPart
+    ]
+
+    # 環境変数で指定したディレクトリ内の古いテスト環境をクリーンアップ
+    let projectDir = getProjectPath()
+    echo "Cleaning up test environments in project directory..."
+    discard cleanupAllTestEnvironments(dryRun = false, olderThanHours = 1)
+
+  test "Create and delete virtual environment":
+    let venvName = "test_env"
+    var venv = createVenv(venvName)
+    check dirExists(venv.path)
+    check fileExists(venv.path / "venv.json")
+
+    # Verify directory structure
+    check:
+      dirExists(venv.path / "nimbledeps")
+      dirExists(venv.path / "nimbledeps/pkgs")
+      dirExists(venv.path / "bin")
+      fileExists(venv.path / "nim.cfg")
+
+    # Verify activation script
+    when defined(windows):
+      check fileExists(venv.path / "activate.bat")
+      let content = readFile(venv.path / "activate.bat")
+      check content.contains("set NIUV_ACTIVE_VENV=" & venvName)
+    else:
+      check fileExists(venv.path / "activate")
+      let content = readFile(venv.path / "activate")
+      check content.contains("export NIUV_ACTIVE_VENV=" & venvName)
+      # Check permissions
+      let perms = getFilePermissions(venv.path / "activate")
+      check perms.contains(fpUserExec)
+
+    # Delete and verify
+    deleteVenv(venvName)
+    check not dirExists(venv.path)
+
+  test "Create with specific Nim version":
+    let venvName = "nim_version_test"
+    let nimVersion = "2.0.6"
+    var venv = createVenv(venvName, nimVersion)
+
+    check:
+      venv.nimVersion == nimVersion
+      dirExists(venv.path)
+
+    # Verify JSON config
+    let venvConfig = parseJson(readFile(venv.path / "venv.json"))
+    check venvConfig["nimVersion"].getStr() == nimVersion
+
+    # Clean up
+    deleteVenv(venvName)
+
+  test "Create with default Nim version":
+    let venvName = "default_nim_test"
+    var venv = createVenv(venvName)
+
+    check:
+      venv.nimVersion == "2.2.4"  # This is the default set in venv.nim
+      dirExists(venv.path)
+
+    # Verify JSON config
+    let venvConfig = parseJson(readFile(venv.path / "venv.json"))
+    check venvConfig["nimVersion"].getStr() == "2.2.4"
+
+    # Clean up
+    deleteVenv(venvName)
+
+  test "Create duplicate environment (error handling)":
+    let venvName = "duplicate_test"
+    # Create first instance
+    var venv = createVenv(venvName)
+    check dirExists(venv.path)
+
+    # Try to create duplicate - should throw VenvError
+    expect VenvError:
+      discard createVenv(venvName)
+
+    # Clean up
+    deleteVenv(venvName)
+
+  test "Delete non-existent environment (error handling)":
+    let nonExistentName = "does_not_exist_" & $epochTime()
+
+    # Try to delete non-existent venv - should throw VenvError
+    expect VenvError:
+      deleteVenv(nonExistentName)
+
+  test "List virtual environments":
+    # 既存の環境をクリーンアップ
+    for venv in listVenvs():
+      try:
+        deleteVenv(venv.name)
+      except CatchableError:
+        echo "Warning: Failed to delete venv: " & venv.name
+
+    # 新しい環境を作成 (一意な名前を使用)
+    let currentTime = epochTime()
+    let intPart = int(currentTime)
+    let fracPart = currentTime - float(intPart)
+    let env1 = "test_env1_" & $intPart
+    let env2 = "test_env2_" & $intPart
+
+    # 既存環境があれば削除
+    if dirExists(getVenvPath(env1)):
+      deleteVenv(env1)
+    if dirExists(getVenvPath(env2)):
+      deleteVenv(env2)
+
+    # 環境作成
+    let venv1 = createVenv(env1)
+    let venv2 = createVenv(env2)
+
+    # 環境一覧を取得
+    let venvs = listVenvs()
+    check venvs.len >= 2
+    check venvs.anyIt(it.name == env1)
+    check venvs.anyIt(it.name == env2)
+
+    # クリーンアップ
+    deleteVenv(env1)
+    deleteVenv(env2)
+
+  test "Activate virtual environment":
+    let currentTime = epochTime()
+    let intPart = int(currentTime)
+    let venvName = "active_env_" & $intPart
+    # 既存環境があれば削除
+    if dirExists(getVenvPath(venvName)):
+      deleteVenv(venvName)
+
+    # Create and activate
+    var venv = createVenv(venvName)
+    activateVenv(venvName)
+
+    # Verify environment variables
+    check:
+      getEnv("NIUV_ACTIVE_VENV") == venvName
+      getEnv("PATH").contains(venv.path / "bin")
+
+    # Try activating non-existent environment
+    let badName = "nonexistent_env_" & $epochTime()
+    expect VenvError:
+      activateVenv(badName)
+
+    # Clean up
+    deleteVenv(venvName)
+
+  test "Environment isolation":
+    let currentTime = epochTime()
+    let intPart = int(currentTime)
+    let env1Name = "env1_" & $intPart
+    let env2Name = "env2_" & $intPart
+
+    # 既存環境があれば削除
+    if dirExists(getVenvPath(env1Name)):
+      deleteVenv(env1Name)
+    if dirExists(getVenvPath(env2Name)):
+      deleteVenv(env2Name)
+
+    # Create two environments with different settings
+    let env1 = createVenv(env1Name, "1.6.8")
+    let env2 = createVenv(env2Name, "2.0.0")
+
+    # Verify isolation
+    check:
+      env1.path != env2.path
+      env1.nimVersion != env2.nimVersion
+      dirExists(env1.path / "nimbledeps")
+      dirExists(env2.path / "nimbledeps")
+
+    # Create files in one environment
+    writeFile(env1.path / "test.txt", "test content")
+    check fileExists(env1.path / "test.txt")
+    check not fileExists(env2.path / "test.txt")
+
+    # Clean up
+    deleteVenv(env1Name)
+    deleteVenv(env2Name)
+
+when isMainModule:
+  echo "Running venv tests manually..."
+  
+  # テスト環境のセットアップ
+  let testDir = getTempDir() / "niuv_test_venv_" & $epochTime()
+  createDir(testDir)
+  
+  # テスト: Create and delete virtual environment
+  block:
+    let venvName = "test_env"
+    var venv = createVenv(venvName)
+    
+    assert dirExists(venv.path)
+    assert fileExists(venv.path / "venv.json")
+    
+    # 削除とチェック
+    deleteVenv(venvName)
+    assert not dirExists(venv.path)
+    
+    echo "✓ Create/delete test passed"
+  
+  # テスト: Environment isolation
+  block:
+    let timestamp = $epochTime()
+    let env1Name = "env1_test_" & timestamp
+    let env2Name = "env2_test_" & timestamp
+    
+    let env1 = createVenv(env1Name, "1.6.8")
+    let env2 = createVenv(env2Name, "2.0.0")
+    
+    assert env1.path != env2.path
+    assert env1.nimVersion != env2.nimVersion
+    
+    # クリーンアップ
+    deleteVenv(env1Name)
+    deleteVenv(env2Name)
+    
+    echo "✓ Environment isolation test passed"
+  
+  # クリーンアップ
+  removeDir(testDir)
+  echo "All venv tests completed successfully"

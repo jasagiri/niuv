@@ -1,0 +1,232 @@
+   Warning: Using project local deps mode
+    Prompt: 0.7.2 not found in any local packages.json, check internet for updatedDownloading Nim 2.2.4 from nim-lang.org
+url: https://nim-lang.org/download/nim-2.2.4.tar.xz
+[2K[1G[                                                  ] 0.04897% 4kb/s[2K[1G[##################################################] 100.0% 0kb/s
+    Warning Nim /Users/jasagiri/.nimble/nimbinaries/nim-2.2.4 is not properly extracted
+ Extracting nim-2.2.4.tar.xz
+ Extracting nim-2.2.4.tar
+     Info:  There is no nim binary in the downloaded directory or it is corrupted. Rebuilding it
+    Warning Building nim from csources failed. Using `build_all`
+      Error Failed to execute: sh build_all.sh
+Downloading https://github.com/nim-lang/Nim.git using git
+
+cmd: git clone -q --depth 1 -b master https://github.com/nim-lang/csources_v2.git csources_v2
+
+cmd: cd csources_v2
+
+cmd: git checkout 86742fb02c6606ab01a532a0085784effb2e753e
+
+cmd: cd /Users/jasagiri/.nimble/pkgcache/githubcom_nimlangNimgit
+
+cmd: which make
+/usr/bin/make
+
+cmd: make -C csources_v2 -j 10 -l 8
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@ssystem@sexceptions.nim.o c_code/2_17/@m..@slib@ssystem@sexceptions.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@sdigitsutils.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sdigitsutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sassertions.nim.o c_code/2_17/@m..@slib@sstd@sassertions.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@ssystem@sdollars.nim.o c_code/3_17/@m..@slib@ssystem@sdollars.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@sdragonbox.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sdragonbox.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@sschubfach.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sschubfach.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sformatfloat.nim.o c_code/2_17/@m..@slib@sstd@sformatfloat.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@ssystem.nim.o c_code/3_17/@m..@slib@ssystem.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sparseutils.nim.o c_code/2_17/@m..@slib@spure@sparseutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@smath.nim.o c_code/3_17/@m..@slib@spure@smath.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@salgorithm.nim.o c_code/3_17/@m..@slib@spure@salgorithm.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@senumutils.nim.o c_code/2_17/@m..@slib@sstd@senumutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sunicode.nim.o c_code/2_17/@m..@slib@spure@sunicode.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sstrutils.nim.o c_code/3_17/@m..@slib@spure@sstrutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@spathnorm.nim.o c_code/2_17/@m..@slib@spure@spathnorm.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@soserrors.nim.o c_code/2_17/@m..@slib@sstd@soserrors.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@sstd@ssyncio.nim.o c_code/3_17/@m..@slib@sstd@ssyncio.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@sposix@sposix.nim.o c_code/3_17/@m..@slib@sposix@sposix.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@soscommon.nim.o c_code/2_17/@m..@slib@sstd@sprivate@soscommon.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@sstd@sprivate@sospaths2.nim.o c_code/3_17/@m..@slib@sstd@sprivate@sospaths2.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@sossymlinks.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sossymlinks.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@stimes.nim.o c_code/3_17/@m..@slib@spure@stimes.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@sstd@sprivate@sosfiles.nim.o c_code/3_17/@m..@slib@sstd@sprivate@sosfiles.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@sosdirs.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sosdirs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@sstd@senvvars.nim.o c_code/3_17/@m..@slib@sstd@senvvars.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@sosappdirs.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sosappdirs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@scmdline.nim.o c_code/2_17/@m..@slib@sstd@scmdline.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sos.nim.o c_code/3_17/@m..@slib@spure@sos.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sparseopt.nim.o c_code/3_17/@m..@slib@spure@sparseopt.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@shashes.nim.o c_code/3_17/@m..@slib@spure@shashes.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sstrtabs.nim.o c_code/2_17/@m..@slib@spure@sstrtabs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@scollections@stables.nim.o c_code/3_17/@m..@slib@spure@scollections@stables.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sstrformat.nim.o c_code/2_17/@m..@slib@spure@sstrformat.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sterminal.nim.o c_code/3_17/@m..@slib@spure@sterminal.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@scollections@ssets.nim.o c_code/2_17/@m..@slib@spure@scollections@ssets.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mpathutils.nim.o c_code/2_17/@mpathutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mropes.nim.o c_code/3_17/@mropes.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mlineinfos.nim.o c_code/2_17/@mlineinfos.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mplatform.nim.o c_code/3_17/@mplatform.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mprefixmatches.nim.o c_code/2_17/@mprefixmatches.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mnimpaths.nim.o c_code/2_17/@mnimpaths.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sobjectdollar.nim.o c_code/2_17/@m..@slib@sstd@sobjectdollar.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@sprivate@sglobs.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sglobs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@moptions.nim.o c_code/3_17/@moptions.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mmsgs.nim.o c_code/3_17/@mmsgs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mcondsyms.nim.o c_code/2_17/@mcondsyms.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mwordrecg.nim.o c_code/2_17/@mwordrecg.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@midents.nim.o c_code/2_17/@midents.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mint128.nim.o c_code/2_17/@mint128.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mast.nim.o c_code/2_17/@mast.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mllstream.nim.o c_code/3_17/@mllstream.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mnimlexbase.nim.o c_code/2_17/@mnimlexbase.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mlexer.nim.o c_code/3_17/@mlexer.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mrenderer.nim.o c_code/3_17/@mrenderer.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mmodulepaths.nim.o c_code/2_17/@mmodulepaths.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sstreams.nim.o c_code/3_17/@m..@slib@spure@sstreams.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sconcurrency@scpuinfo.nim.o c_code/3_17/@m..@slib@spure@sconcurrency@scpuinfo.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@scollections@sdeques.nim.o c_code/3_17/@m..@slib@spure@scollections@sdeques.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sosproc.nim.o c_code/3_17/@m..@slib@spure@sosproc.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@sstd@ssha1.nim.o c_code/3_17/@m..@slib@sstd@ssha1.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@slexbase.nim.o c_code/2_17/@m..@slib@spure@slexbase.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sparsejson.nim.o c_code/2_17/@m..@slib@spure@sparsejson.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sjson.nim.o c_code/3_17/@m..@slib@spure@sjson.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@sstd@sjsonutils.nim.o c_code/3_17/@m..@slib@sstd@sjsonutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mextccomp.nim.o c_code/3_17/@mextccomp.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mnimblecmd.nim.o c_code/3_17/@mnimblecmd.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mcommands.nim.o c_code/2_17/@mcommands.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mparser.nim.o c_code/2_17/@mparser.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mfilters.nim.o c_code/2_17/@mfilters.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mfilter_tmpl.nim.o c_code/2_17/@mfilter_tmpl.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@msyntaxes.nim.o c_code/3_17/@msyntaxes.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@spackedsets.nim.o c_code/2_17/@m..@slib@sstd@spackedsets.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mrodutils.nim.o c_code/2_17/@mrodutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mastalgo.nim.o c_code/2_17/@mastalgo.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mtrees.nim.o c_code/2_17/@mtrees.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mmd5_old.nim.o c_code/2_17/@mmd5_old.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mbtrees.nim.o c_code/3_17/@mbtrees.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mpackages.nim.o c_code/2_17/@mpackages.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mic@srodfiles.nim.o c_code/3_17/@mic@srodfiles.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mic@sbitabs.nim.o c_code/2_17/@mic@sbitabs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mic@spacked_ast.nim.o c_code/2_17/@mic@spacked_ast.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mic@sic.nim.o c_code/2_17/@mic@sic.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mmodulegraphs.nim.o c_code/2_17/@mmodulegraphs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mastmsgs.nim.o c_code/2_17/@mastmsgs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mtypes.nim.o c_code/2_17/@mtypes.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mmagicsys.nim.o c_code/2_17/@mmagicsys.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mbitsets.nim.o c_code/2_17/@mbitsets.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mnimsets.nim.o c_code/3_17/@mnimsets.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msemfold.nim.o c_code/2_17/@msemfold.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mvmdef.nim.o c_code/3_17/@mvmdef.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msemdata.nim.o c_code/2_17/@msemdata.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mlinter.nim.o c_code/2_17/@mlinter.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mnimfix@sprettybase.nim.o c_code/2_17/@mnimfix@sprettybase.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@sstd@seditdistance.nim.o c_code/2_17/@m..@slib@sstd@seditdistance.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@scollections@sheapqueue.nim.o c_code/2_17/@m..@slib@spure@scollections@sheapqueue.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mlookups.nim.o c_code/2_17/@mlookups.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mconcepts.nim.o c_code/2_17/@mconcepts.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msemtypinst.nim.o c_code/2_17/@msemtypinst.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mparampatterns.nim.o c_code/2_17/@mparampatterns.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mlowerings.nim.o c_code/2_17/@mlowerings.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@msigmatch.nim.o c_code/3_17/@msigmatch.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mimporter.nim.o c_code/2_17/@mimporter.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mprocfind.nim.o c_code/2_17/@mprocfind.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mpragmas.nim.o c_code/2_17/@mpragmas.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mreorder.nim.o c_code/2_17/@mreorder.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mpasses.nim.o c_code/2_17/@mpasses.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msaturate.nim.o c_code/2_17/@msaturate.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mguards.nim.o c_code/2_17/@mguards.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mtypeallowed.nim.o c_code/2_17/@mtypeallowed.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@misolation_check.nim.o c_code/2_17/@misolation_check.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mvarpartitions.nim.o c_code/2_17/@mvarpartitions.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mtreetab.nim.o c_code/2_17/@mtreetab.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mnilcheck.nim.o c_code/2_17/@mnilcheck.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@merrorhandling.nim.o c_code/2_17/@merrorhandling.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@maliasanalysis.nim.o c_code/2_17/@maliasanalysis.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msemstrictfuncs.nim.o c_code/2_17/@msemstrictfuncs.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msighashes.nim.o c_code/2_17/@msighashes.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mndi.nim.o c_code/3_17/@mndi.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mcgendata.nim.o c_code/2_17/@mcgendata.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mccgutils.nim.o c_code/2_17/@mccgutils.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mliftdestructors.nim.o c_code/2_17/@mliftdestructors.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msempass2.nim.o c_code/2_17/@msempass2.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mcgmeth.nim.o c_code/2_17/@mcgmeth.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mliftlocals.nim.o c_code/2_17/@mliftlocals.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mlambdalifting.nim.o c_code/2_17/@mlambdalifting.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mclosureiters.nim.o c_code/2_17/@mclosureiters.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mtransf.nim.o c_code/2_17/@mtransf.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mvmgen.nim.o c_code/2_17/@mvmgen.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mvmdeps.nim.o c_code/3_17/@mvmdeps.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mgorgeimpl.nim.o c_code/3_17/@mgorgeimpl.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mmacrocacheimpl.nim.o c_code/2_17/@mmacrocacheimpl.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mvmprofiler.nim.o c_code/3_17/@mvmprofiler.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mevaltempl.nim.o c_code/2_17/@mevaltempl.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mvmconv.nim.o c_code/3_17/@mvmconv.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mvmmarshal.nim.o c_code/2_17/@mvmmarshal.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mvm.nim.o c_code/3_17/@mvm.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@maliases.nim.o c_code/2_17/@maliases.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mpatterns.nim.o c_code/2_17/@mpatterns.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msemmacrosanity.nim.o c_code/2_17/@msemmacrosanity.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mpluginsupport.nim.o c_code/2_17/@mpluginsupport.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mplugins@slocals.nim.o c_code/2_17/@mplugins@slocals.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mplugins@sitersgen.nim.o c_code/2_17/@mplugins@sitersgen.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mplugins@sactive.nim.o c_code/2_17/@mplugins@sactive.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@menumtostr.nim.o c_code/2_17/@menumtostr.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mspawn.nim.o c_code/2_17/@mspawn.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@msem.nim.o c_code/3_17/@msem.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@moptimizer.nim.o c_code/2_17/@moptimizer.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mdfa.nim.o c_code/2_17/@mdfa.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@minjectdestructors.nim.o c_code/3_17/@minjectdestructors.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msemparallel.nim.o c_code/2_17/@msemparallel.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sdynlib.nim.o c_code/2_17/@m..@slib@spure@sdynlib.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mcgen.nim.o c_code/3_17/@mcgen.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mic@sreplayer.nim.o c_code/3_17/@mic@sreplayer.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mmodules.nim.o c_code/3_17/@mmodules.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mscriptconfig.nim.o c_code/3_17/@mscriptconfig.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mnimconf.nim.o c_code/3_17/@mnimconf.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mpassaux.nim.o c_code/2_17/@mpassaux.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mdepends.nim.o c_code/2_17/@mdepends.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mic@sdce.nim.o c_code/2_17/@mic@sdce.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mic@scbackend.nim.o c_code/2_17/@mic@scbackend.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mic@sintegrity.nim.o c_code/2_17/@mic@sintegrity.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mic@snavigator.nim.o c_code/2_17/@mic@snavigator.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@msourcemap.nim.o c_code/2_17/@msourcemap.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mjsgen.nim.o c_code/3_17/@mjsgen.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spackages@sdocutils@srstast.nim.o c_code/2_17/@m..@slib@spackages@sdocutils@srstast.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spackages@sdocutils@sdochelpers.nim.o c_code/3_17/@m..@slib@spackages@sdocutils@sdochelpers.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@scollections@slists.nim.o c_code/2_17/@m..@slib@spure@scollections@slists.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spackages@sdocutils@shighlite.nim.o c_code/2_17/@m..@slib@spackages@sdocutils@shighlite.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spackages@sdocutils@srst.nim.o c_code/3_17/@m..@slib@spackages@sdocutils@srst.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spackages@sdocutils@srstgen.nim.o c_code/3_17/@m..@slib@spackages@sdocutils@srstgen.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sxmltree.nim.o c_code/2_17/@m..@slib@spure@sxmltree.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mtypesrenderer.nim.o c_code/2_17/@mtypesrenderer.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mrenderverbatim.nim.o c_code/2_17/@mrenderverbatim.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@sbase64.nim.o c_code/2_17/@m..@slib@spure@sbase64.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@m..@slib@spure@suri.nim.o c_code/2_17/@m..@slib@spure@suri.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mdocgen.nim.o c_code/3_17/@mdocgen.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mdocgen2.nim.o c_code/2_17/@mdocgen2.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mmain.nim.o c_code/3_17/@mmain.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/2_17/@mcmdlinehelper.nim.o c_code/2_17/@mcmdlinehelper.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@m..@slib@spure@sbrowsers.nim.o c_code/3_17/@m..@slib@spure@sbrowsers.nim.c
+clang -Ic_code -w -fmax-errors=3 -O3 -fno-strict-aliasing -fno-ident -fno-math-errno  -I/usr/local/opt/openjdk/include  -c -o c_code/3_17/@mnim.nim.o c_code/3_17/@mnim.nim.c
+clang -o ../bin/nim c_code/2_17/@m..@slib@ssystem@sexceptions.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sdigitsutils.nim.o c_code/2_17/@m..@slib@sstd@sassertions.nim.o c_code/3_17/@m..@slib@ssystem@sdollars.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sdragonbox.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sschubfach.nim.o c_code/2_17/@m..@slib@sstd@sformatfloat.nim.o c_code/3_17/@m..@slib@ssystem.nim.o c_code/2_17/@m..@slib@spure@sparseutils.nim.o c_code/3_17/@m..@slib@spure@smath.nim.o c_code/3_17/@m..@slib@spure@salgorithm.nim.o c_code/2_17/@m..@slib@sstd@senumutils.nim.o c_code/2_17/@m..@slib@spure@sunicode.nim.o c_code/3_17/@m..@slib@spure@sstrutils.nim.o c_code/2_17/@m..@slib@spure@spathnorm.nim.o c_code/2_17/@m..@slib@sstd@soserrors.nim.o c_code/3_17/@m..@slib@sstd@ssyncio.nim.o c_code/3_17/@m..@slib@sposix@sposix.nim.o c_code/2_17/@m..@slib@sstd@sprivate@soscommon.nim.o c_code/3_17/@m..@slib@sstd@sprivate@sospaths2.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sossymlinks.nim.o c_code/3_17/@m..@slib@spure@stimes.nim.o c_code/3_17/@m..@slib@sstd@sprivate@sosfiles.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sosdirs.nim.o c_code/3_17/@m..@slib@sstd@senvvars.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sosappdirs.nim.o c_code/2_17/@m..@slib@sstd@scmdline.nim.o c_code/3_17/@m..@slib@spure@sos.nim.o c_code/3_17/@m..@slib@spure@sparseopt.nim.o c_code/3_17/@m..@slib@spure@shashes.nim.o c_code/2_17/@m..@slib@spure@sstrtabs.nim.o c_code/3_17/@m..@slib@spure@scollections@stables.nim.o c_code/2_17/@m..@slib@spure@sstrformat.nim.o c_code/3_17/@m..@slib@spure@sterminal.nim.o c_code/2_17/@m..@slib@spure@scollections@ssets.nim.o c_code/2_17/@mpathutils.nim.o c_code/3_17/@mropes.nim.o c_code/2_17/@mlineinfos.nim.o c_code/3_17/@mplatform.nim.o c_code/2_17/@mprefixmatches.nim.o c_code/2_17/@mnimpaths.nim.o c_code/2_17/@m..@slib@sstd@sobjectdollar.nim.o c_code/2_17/@m..@slib@sstd@sprivate@sglobs.nim.o c_code/3_17/@moptions.nim.o c_code/3_17/@mmsgs.nim.o c_code/2_17/@mcondsyms.nim.o c_code/2_17/@mwordrecg.nim.o c_code/2_17/@midents.nim.o c_code/2_17/@mint128.nim.o c_code/2_17/@mast.nim.o c_code/3_17/@mllstream.nim.o c_code/2_17/@mnimlexbase.nim.o c_code/3_17/@mlexer.nim.o c_code/3_17/@mrenderer.nim.o c_code/2_17/@mmodulepaths.nim.o c_code/3_17/@m..@slib@spure@sstreams.nim.o c_code/3_17/@m..@slib@spure@sconcurrency@scpuinfo.nim.o c_code/3_17/@m..@slib@spure@scollections@sdeques.nim.o c_code/3_17/@m..@slib@spure@sosproc.nim.o c_code/3_17/@m..@slib@sstd@ssha1.nim.o c_code/2_17/@m..@slib@spure@slexbase.nim.o c_code/2_17/@m..@slib@spure@sparsejson.nim.o c_code/3_17/@m..@slib@spure@sjson.nim.o c_code/3_17/@m..@slib@sstd@sjsonutils.nim.o c_code/3_17/@mextccomp.nim.o c_code/3_17/@mnimblecmd.nim.o c_code/2_17/@mcommands.nim.o c_code/2_17/@mparser.nim.o c_code/2_17/@mfilters.nim.o c_code/2_17/@mfilter_tmpl.nim.o c_code/3_17/@msyntaxes.nim.o c_code/2_17/@m..@slib@sstd@spackedsets.nim.o c_code/2_17/@mrodutils.nim.o c_code/2_17/@mastalgo.nim.o c_code/2_17/@mtrees.nim.o c_code/2_17/@mmd5_old.nim.o c_code/3_17/@mbtrees.nim.o c_code/2_17/@mpackages.nim.o c_code/3_17/@mic@srodfiles.nim.o c_code/2_17/@mic@sbitabs.nim.o c_code/2_17/@mic@spacked_ast.nim.o c_code/2_17/@mic@sic.nim.o c_code/2_17/@mmodulegraphs.nim.o c_code/2_17/@mastmsgs.nim.o c_code/2_17/@mtypes.nim.o c_code/2_17/@mmagicsys.nim.o c_code/2_17/@mbitsets.nim.o c_code/3_17/@mnimsets.nim.o c_code/2_17/@msemfold.nim.o c_code/3_17/@mvmdef.nim.o c_code/2_17/@msemdata.nim.o c_code/2_17/@mlinter.nim.o c_code/2_17/@mnimfix@sprettybase.nim.o c_code/2_17/@m..@slib@sstd@seditdistance.nim.o c_code/2_17/@m..@slib@spure@scollections@sheapqueue.nim.o c_code/2_17/@mlookups.nim.o c_code/2_17/@mconcepts.nim.o c_code/2_17/@msemtypinst.nim.o c_code/2_17/@mparampatterns.nim.o c_code/2_17/@mlowerings.nim.o c_code/3_17/@msigmatch.nim.o c_code/2_17/@mimporter.nim.o c_code/2_17/@mprocfind.nim.o c_code/2_17/@mpragmas.nim.o c_code/2_17/@mreorder.nim.o c_code/2_17/@mpasses.nim.o c_code/2_17/@msaturate.nim.o c_code/2_17/@mguards.nim.o c_code/2_17/@mtypeallowed.nim.o c_code/2_17/@misolation_check.nim.o c_code/2_17/@mvarpartitions.nim.o c_code/2_17/@mtreetab.nim.o c_code/2_17/@mnilcheck.nim.o c_code/2_17/@merrorhandling.nim.o c_code/2_17/@maliasanalysis.nim.o c_code/2_17/@msemstrictfuncs.nim.o c_code/2_17/@msighashes.nim.o c_code/3_17/@mndi.nim.o c_code/2_17/@mcgendata.nim.o c_code/2_17/@mccgutils.nim.o c_code/2_17/@mliftdestructors.nim.o c_code/2_17/@msempass2.nim.o c_code/2_17/@mcgmeth.nim.o c_code/2_17/@mliftlocals.nim.o c_code/2_17/@mlambdalifting.nim.o c_code/2_17/@mclosureiters.nim.o c_code/2_17/@mtransf.nim.o c_code/2_17/@mvmgen.nim.o c_code/3_17/@mvmdeps.nim.o c_code/3_17/@mgorgeimpl.nim.o c_code/2_17/@mmacrocacheimpl.nim.o c_code/3_17/@mvmprofiler.nim.o c_code/2_17/@mevaltempl.nim.o c_code/3_17/@mvmconv.nim.o c_code/2_17/@mvmmarshal.nim.o c_code/3_17/@mvm.nim.o c_code/2_17/@maliases.nim.o c_code/2_17/@mpatterns.nim.o c_code/2_17/@msemmacrosanity.nim.o c_code/2_17/@mpluginsupport.nim.o c_code/2_17/@mplugins@slocals.nim.o c_code/2_17/@mplugins@sitersgen.nim.o c_code/2_17/@mplugins@sactive.nim.o c_code/2_17/@menumtostr.nim.o c_code/2_17/@mspawn.nim.o c_code/3_17/@msem.nim.o c_code/2_17/@moptimizer.nim.o c_code/2_17/@mdfa.nim.o c_code/3_17/@minjectdestructors.nim.o c_code/2_17/@msemparallel.nim.o c_code/2_17/@m..@slib@spure@sdynlib.nim.o c_code/3_17/@mcgen.nim.o c_code/3_17/@mic@sreplayer.nim.o c_code/3_17/@mmodules.nim.o c_code/3_17/@mscriptconfig.nim.o c_code/3_17/@mnimconf.nim.o c_code/2_17/@mpassaux.nim.o c_code/2_17/@mdepends.nim.o c_code/2_17/@mic@sdce.nim.o c_code/2_17/@mic@scbackend.nim.o c_code/2_17/@mic@sintegrity.nim.o c_code/2_17/@mic@snavigator.nim.o c_code/2_17/@msourcemap.nim.o c_code/3_17/@mjsgen.nim.o c_code/2_17/@m..@slib@spackages@sdocutils@srstast.nim.o c_code/3_17/@m..@slib@spackages@sdocutils@sdochelpers.nim.o c_code/2_17/@m..@slib@spure@scollections@slists.nim.o c_code/2_17/@m..@slib@spackages@sdocutils@shighlite.nim.o c_code/3_17/@m..@slib@spackages@sdocutils@srst.nim.o c_code/3_17/@m..@slib@spackages@sdocutils@srstgen.nim.o c_code/2_17/@m..@slib@spure@sxmltree.nim.o c_code/2_17/@mtypesrenderer.nim.o c_code/2_17/@mrenderverbatim.nim.o c_code/2_17/@m..@slib@spure@sbase64.nim.o c_code/2_17/@m..@slib@spure@suri.nim.o c_code/3_17/@mdocgen.nim.o c_code/2_17/@mdocgen2.nim.o c_code/3_17/@mmain.nim.o c_code/2_17/@mcmdlinehelper.nim.o c_code/3_17/@m..@slib@spure@sbrowsers.nim.o c_code/3_17/@mnim.nim.o  -ldl -lm
+SUCCESS
+
+cmd: cp bin/nim bin/nim_csources_86742fb02c6606ab01a532a0085784effb2e753e
+
+cmd: rm -f bin/nim
+
+cmd: cp bin/nim_csources_86742fb02c6606ab01a532a0085784effb2e753e bin/nim
+
+cmd: bin/nim_csources_86742fb02c6606ab01a532a0085784effb2e753e -v
+Nim Compiler Version 1.9.1 [MacOSX: arm64]
+Compiled at 2023-01-02
+Copyright (c) 2006-2022 by Andreas Rumpf
+
+git hash: 7f6681b4c4ccc0dc43fd256280be4c3ad3c773e5
+active boot switches: -d:release -d:danger
+
+cmd: bin/nim c --noNimblePath --skipUserCfg --skipParentCfg --hints:off koch
+
+cmd: ./koch boot -d:release --skipUserCfg --skipParentCfg --hints:off
+deps.cmd: git checkout -q f8f6bd34bfa3fe12c64b919059ad856a96efcba0
+iteration: 1
+bin/nim c  --skipUserCfg --skipParentCfg -d:nimKochBootstrap --nimcache:nimcache/r_macosx_arm64 -d:release --skipUserCfg --skipParentCfg --hints:off --noNimblePath --compileOnly compiler/nim.nim
+bin/nim jsonscript --noNimblePath --nimcache:nimcache/r_macosx_arm64 -d:release --skipUserCfg --skipParentCfg --hints:off compiler/nim.nim
+iteration: 2
+compiler/nim1 c  --nimcache:nimcache/r_macosx_arm64 -d:release --skipUserCfg --skipParentCfg --hints:off --noNimblePath --compileOnly compiler/nim.nim
+compiler/nim1 jsonscript --noNimblePath --nimcache:nimcache/r_macosx_arm64 -d:release --skipUserCfg --skipParentCfg --hints:off compiler/nim.nim
