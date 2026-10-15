@@ -175,3 +175,16 @@ suite "NIV-17 fixed bytes":
     delEnv("ERL_COMPILER_OPTIONS")
     check rb.isOk
     check beamHashes(ra) == beamHashes(rb.get)
+
+suite "NIV-23 beam placement":
+  test "Given a Gleam build, When its beams are placed, Then each sits at beam/<application>/<module>.beam under the output":
+    let d = freshDir("gl-place")
+    let r = build(d, makeWorkspace(d), d / "stage")
+    check r.isOk
+    var placed: seq[string]
+    for a in r.get.artifacts:
+      check a.path.isRelativeTo(d / "out" / "beam")
+      placed.add a.path.relativePath(d / "out")
+    check (("beam" / "app" / "app.beam") in placed)
+    check (("beam" / "app" / "app_ffi.beam") in placed)
+    check (("beam" / "lib_gl" / "lib_gl.beam") in placed)

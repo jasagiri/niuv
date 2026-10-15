@@ -26,6 +26,7 @@
 | NIV-20 | tests/unit/test_sbom.nim: `NIV-20 license gate`、tests/unit/test_cli.nim: `NIV-20 license gate through the command line`、tests/acceptance/test_fukai_agent.nim: `N2 acceptance: a GPL-3.0 dependency of a sealed agent` | あり（N2） |
 | NIV-21 | tests/unit/test_child.nim: `NIV-21 child form` | あり（N2） |
 | NIV-22 | tests/unit/test_cli.nim: `NIV-22 commands` | あり（N1） |
+| NIV-23 | tests/unit/test_gleambuild.nim: `NIV-23 beam placement` | あり（N2） |
 
 ## 注
 
