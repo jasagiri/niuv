@@ -17,3 +17,8 @@ testresults/
 .vscode/
 .idea/
 *.swp
+
+# Test binaries (the .nim files stay)
+/tests/test_all
+/tests/unit/*
+!/tests/unit/*.nim

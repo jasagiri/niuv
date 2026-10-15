@@ -4,3 +4,12 @@
 
 | モジュール | 状態 |
 |---|---|
+| src/niuv/decl.nim | 未測定（実装が落ち着いてから、push の前に 1 回） |
+| src/niuv/workspace.nim | 未測定 |
+| src/niuv/resolve.nim | 未測定 |
+| src/niuv/hashing.nim | 未測定 |
+| src/niuv/lock.nim | 未測定 |
+| src/niuv/toolchain.nim | 未測定 |
+| src/niuv/nimbuild.nim | 未測定 |
+| src/niuv/build.nim | 未測定 |
+| src/niuv/cli.nim | 未測定 |
