@@ -1,0 +1,40 @@
+#!/bin/sh
+# This file must be used with "source" or "." command
+# Usage: . ./activate
+
+# Save old environment variables
+OLD_PATH="$PATH"
+OLD_NIMBLE_PATH="$NIMBLE_PATH"
+OLD_PWD="$PWD"
+
+# Set new environment variables
+export PATH="$PWD/nimbledeps/bin:$PATH"
+export NIMBLE_PATH="$PWD/nimbledeps/pkgs"
+export NIUV_ACTIVE="1"
+export NIUV_PROJECT="$PWD"
+
+# Change prompt
+OLD_PS1="$PS1"
+PS1_PREFIX="(niuv:$(basename "$PWD")) "
+if [ -z "$ZSH_VERSION" ]; then
+  export PS1="$PS1_PREFIX$PS1"
+else
+  export PS1="%{$fg[green]%}$PS1_PREFIX%{$reset_color%}$PS1"
+fi
+
+deactivate() {
+  # Restore old environment variables
+  export PATH="$OLD_PATH"
+  export NIMBLE_PATH="$OLD_NIMBLE_PATH"
+  export PWD="$OLD_PWD"
+  unset NIUV_ACTIVE
+  unset NIUV_PROJECT
+  
+  # Restore prompt
+  export PS1="$OLD_PS1"
+  
+  # Remove this function
+  unset -f deactivate
+}
+
+echo "Virtual environment activated. Use 'deactivate' to exit."
