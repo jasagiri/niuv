@@ -1,9 +1,0 @@
-[tool.niuv]
-nimbleLocalPath = "nimbledeps/pkgs"
-nimVersion = "2.2.4"
-parallelJobs = 4
-verboseOutput = false
-shellIntegration = false
-autoLock = false
-lockfile = "niuv.lock"
-nimbleDir = "nimbledeps"

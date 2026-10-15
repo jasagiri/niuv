@@ -1,7 +1,0 @@
---require spec_helper
---pattern "spec/**/*_spec.sh"
---format documentation
---color
---fail-fast
---warnings
---depth 10
