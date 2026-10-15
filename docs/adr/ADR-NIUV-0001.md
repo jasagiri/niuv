@@ -66,7 +66,7 @@ Gleam
 
 ## 採らなかった案（コメントに書かない設計判断の置き場）
 
-- **fukai の `scripts/build.sh` と同じバイト列にそろえる**: niuv の出力は、同じ引数の `nim c`（設定ファイルを読まず、探索パスを旗で渡す）と一致することを確かめた（`fukai/store` と `fukai/keeper` の 4 つ）。`build.sh` の出力とは一致しない。理由は 2 つ。(1) nimcrypto・results が nimble の lazy な探索（`pkgs2`）で見つかると、モジュールの名前が `@nnimcrypto-0.7.3-<hash>@s…` になり、`--path` で指すと `@pnimcrypto@s…` になる。シンボル名が変わるので、実行ファイルが違う。(2) 設定ファイル（`nim.cfg`）を読むとコンパイラのファイル番号が 1 つずれ、`_Dl_<番号>_` のシンボル名と `LC_UUID` が変わる。そろえるには nimble の暗黙の探索を許すしかなく、NIV-14（宣言に無い依存は見つからない）に反する。そろえない。
+- **fukai の `scripts/build.sh` と同じバイト列にそろえる**: niuv の出力は、同じ引数の `nim c`（設定ファイルを読まず、探索パスを旗で渡す）と一致することを確かめた（`fukai/store` と `fukai/keeper` の 4 つ）。`build.sh` の出力とは一致しない。理由は 2 つ。(1) nimcrypto・results が nimble の lazy な探索（`pkgs2`）で見つかると、モジュールの名前が `@nnimcrypto-0.7.3-<hash>@s…` になり、`--path` で指すと `@pnimcrypto@s…` になる。シンボル名が変わるので、実行ファイルが違う。(2) 設定ファイル（`nim.cfg`）を読むとコンパイラのファイル番号が 1 つずれ、`_Dl_<番号>_` のシンボル名と `LC_UUID` が変わる。そろえるには nimble の暗黙の探索を許すしかなく、NIV-14（宣言に無い依存は見つからない）に反する。そろえない。違いが名前だけであることは、2026-10-16 に `--genDeps:on` で両方の依存の一覧を出して確かめた: `sealer_child`・`blob_child`（174 件）、`key_child`（154 件）、`fukai_key`（160 件）で、コンパイルしたソースの組と各ファイルの SHA-256 が一致し、外の依存の置き場（BearSSL 0.2.13 の pkgcache、pkgs2 の nimcrypto 0.7.3・results 0.5.1）も同じ。旗も宣言と `build.sh` で同じ。
 
 - **nimble に任せる**: nimble の lazy な pkgs2 は 0.2.6 しか持たず、BearSSL のように固定した版を別の場所から使うには `--path` の手書きが要る。nimble の暗黙の探索は、宣言に無い依存が通ってしまう（NIV-14 が閉じる）。
 - **`nim.cfg` を生成する**: 設定ファイルは周りのディレクトリの設定と重なり、どの旗が効いたかが見えない。旗は引数で渡し、ロックと目録に結ぶ。
