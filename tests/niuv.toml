@@ -1,9 +1,0 @@
-[env]
-NIUV_TEST_MODE = "1"
-PATH = "/Users/jasagiri/_temp/niuv/nimbledeps/bin:$PATH"
-
-[config]
-nimbleLocalPath = "nimbledeps/pkgs"
-nimVersion = ""
-verboseOutput = false
-shellIntegration = false
