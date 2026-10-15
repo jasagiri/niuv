@@ -38,6 +38,7 @@ type
     source*: string
     version*: string       ## exactly x.y.z (NIV-10)
     src*: string           ## relative to the dependency's directory
+    license*: string       ## "" when not declared; the SBOM then says NOASSERTION
 
   PackageDecl* = object
     name*, version*, license*: string
@@ -187,7 +188,7 @@ proc readExternal(r: Reader, name: string, t: TomlTableRef): NResult[ExternalDep
   let ctx = "dependencies.external." & name
   if not validName(name):
     return r.fail[:ExternalDep](ctx, "name '" & name & "' may hold letters, digits, '-' and '_' only")
-  ?r.checkKeys(t, ["source", "version", "src"], ctx)
+  ?r.checkKeys(t, ["source", "version", "src", "license"], ctx)
   var e = ExternalDep(name: name)
   e.source = ?r.str(t, "source", ctx, true)
   e.version = ?r.str(t, "version", ctx, true)
@@ -197,6 +198,7 @@ proc readExternal(r: Reader, name: string, t: TomlTableRef): NResult[ExternalDep
         "version '" & e.version & "' is a range; only an exact x.y.z is accepted", ekRange)
     return r.fail[:ExternalDep](ctx, "version '" & e.version & "' is not x.y.z")
   e.src = ?r.str(t, "src", ctx, false, ".")
+  e.license = ?r.str(t, "license", ctx, false)
   ok(e)
 
 proc readDependencies(r: Reader, t: TomlTableRef, d: var PackageDecl): NResult[void] {.raises: [].} =

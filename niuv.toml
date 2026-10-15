@@ -1,66 +1,33 @@
-# niuv.toml - Generated from .nimble file
-# Nim Virtual Environment Project Configuration
-
-[project]
-author = "jasagiri"
-license = "Apache-2.0"
-version = "0.1.0"
-description = "Nim Virtual Environment Manager and Nimble Replacement"
+# niuv builds itself: `niuv build niuv` in a workspace that lists this
+# directory, nim-cbor-det and nim-frames (see CLAUDE.md).
+[package]
 name = "niuv"
+version = "0.2.0"
+license = "Apache-2.0"
+
+[nim]
+src = "src"
+flags = ["--mm:orc"]
+
+[[nim.bin]]
+name = "niuv"
+main = "src/niuv.nim"
+flags = ["-d:release", "--hints:off"]
 
 [dependencies]
-egison-patterns = ">= 1.0.0"
-nim-design-patterns = ">= 0.1.0"
-nim-testkit = ">= 0.1.0"
-nim = ">= 2.0.0"
-parsetoml = ">= 0.7.2"
+workspace = ["nim-cbor-det", "nim-frames"]
 
-[tasks]
-scaffold = "Scaffold a new module or project"
-docs = "niuv doc --project --format=html"
-coverage = "niuv coverage --format=html,lcov,json"
-checkScripts = "Check if all required scripts exist"
-featureOne = "Run a specific feature test"
-testOne = "Run a specific test"
-install = "niuv install --user"
-help = "Show available tasks"
-clean = "niuv clean --all"
-build = "niuv compile --optimize --output=build/"
-test = "niuv test --coverage --parallel"
-buildTest = "Build a test without running it"
-featureReport = "Generate feature test reports"
+[dependencies.external.parsetoml]
+source = "github.com/NimParsers/parsetoml"
+version = "0.7.2"
+license = "MIT"
 
-[testing]
-parallel_execution = true
-mece_organization = true
-coverage_threshold = 95.0
-output_format = ["html", "json", "lcov"]
-framework = "nim-testkit"
+[dependencies.external.results]
+source = "github.com/arnetheduck/nim-results"
+version = "0.5.1"
+license = "MIT"
 
-[build]
-memory_management = "arc"
-safety_checks = "true"
-optimization = "speed"
-backend = "c"
-debug_info = "true"
-
-[coverage]
-types = ["line", "branch", "function"]
-format = ["html", "lcov", "json"]
-threshold = 95.0
-output_dir = ".coverage"
-enabled = true
-
-[paths]
-tests = "tests"
-docs = "docs"
-bin = "build/bin"
-src = "src"
-build = "build"
-
-[quality]
-security_scan_enabled = true
-documentation_coverage_minimum = 90.0
-performance_regression_threshold = 5.0
-code_coverage_minimum = 95.0
-
+[dependencies.external.checksums]
+source = "github.com/nim-lang/checksums"
+version = "0.2.1"
+license = "MIT"

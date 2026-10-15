@@ -1,7 +1,7 @@
 ## The command line (NIV-22): lock, check, build, child. Nothing else.
 
 import std/[os, strutils, tables]
-import ./[artifact, build, errors, lock, resolve, workspace]
+import ./[artifact, build, child, errors, lock, resolve, workspace]
 
 type
   CliResult* = object
@@ -14,7 +14,7 @@ const
 commands:
   lock                      pin tools, packages and external dependencies (writes niuv.lock)
   check <package>           resolve the closure of a package and list it
-  build <package>           build the package's artifacts [--out DIR] [--bin NAME]...
+  build <package>           build the package's artifacts [--out DIR] [--bin NAME]... [--stage DIR]
   child                     serve one build request on frames (for the key keeper's children)
 
 options:
@@ -94,7 +94,7 @@ proc cmdCheck(args: seq[string]): CliResult {.raises: [].} =
   CliResult(stdout: o)
 
 proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
-  let p = parseArgs(args, ["--workspace", "--out", "--bin"])
+  let p = parseArgs(args, ["--workspace", "--out", "--bin", "--stage"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len != 1: return usageFail("build needs one package name")
   let ws = openWorkspace(p.get)
@@ -107,12 +107,16 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
       outDir = absolutePath(outGiven[^1])
     except CatchableError as e:
       return fail("--out " & outGiven[^1] & ": " & e.msg)
-  let r = buildPackage(ws.get, package, outDir, p.get.opts.getOrDefault("--bin"))
+  let stageGiven = p.get.opts.getOrDefault("--stage")
+  let stageRoot = if stageGiven.len > 0: stageGiven[^1] else: defaultStageRoot()
+  let r = buildPackage(ws.get, package, outDir, stageRoot, p.get.opts.getOrDefault("--bin"))
   if r.isErr: return fail($r.error)
   var o = ""
   for a in r.get.artifacts:
     o.add a.name & " " & $a.kind & " " & a.sha256 & " " & $a.size & " " & a.path & "\n"
   for n in r.get.notes: o.add "note: " & n & "\n"
+  o.add "manifest " & r.get.manifestPath & "\n"
+  o.add "sbom " & r.get.sbomPath & "\n"
   CliResult(stdout: o)
 
 proc runCli*(args: seq[string]): CliResult {.raises: [].} =
@@ -122,5 +126,5 @@ proc runCli*(args: seq[string]): CliResult {.raises: [].} =
   of "lock": cmdLock(args[1 .. ^1])
   of "check": cmdCheck(args[1 .. ^1])
   of "build": cmdBuild(args[1 .. ^1])
-  of "child": usageFail("child is not implemented yet")
+  of "child": CliResult(code: runBuildChild())
   else: usageFail("unknown command '" & args[0] & "'")

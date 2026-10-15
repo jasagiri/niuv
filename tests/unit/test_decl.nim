@@ -185,6 +185,12 @@ src = "."
     let d = parsed(Minimal & "\n[dependencies.external.r]\nsource = \"github.com/a/b\"\nversion = \"1.0.0\"\n")
     check d.get.externals[0].src == "."
 
+  test "Given an external with a license, When parsed, Then the license is read; without one it is empty":
+    let with = parsed(Minimal & "\n[dependencies.external.r]\nsource = \"github.com/a/b\"\nversion = \"1.0.0\"\nlicense = \"MIT\"\n")
+    check with.get.externals[0].license == "MIT"
+    let without = parsed(Minimal & "\n[dependencies.external.r]\nsource = \"github.com/a/b\"\nversion = \"1.0.0\"\n")
+    check without.get.externals[0].license == ""
+
   test "Given an external without source, When parsed, Then it is refused":
     check parsed(Minimal & "\n[dependencies.external.r]\nversion = \"1.0.0\"\n").isErr
 

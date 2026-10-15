@@ -17,7 +17,7 @@
 - **NIV-02** `[nim]` 節は `src`（探索パスの根。既定 `src`）、`flags`（このパッケージを根にビルドするとき `nim c` に渡す旗）、`[[nim.bin]]`（出す実行ファイル。`name`、`main`、`flags`、`sealed`）を持つ。`name` は 1 つの宣言の中で重ならない。`sealed` の既定は偽。
 - **NIV-03** `[gleam]` 節は `root`（Gleam のパッケージの根。既定 `.`）と `sealed` を持つ。
 - **NIV-04** `[wasm]` 節は `entry` と `sealed` を持つ。niuv は宣言の形を読んで検証するだけで、WASM のコンパイル手順は持たない。ビルドは「WASM は宣言のみ。ビルドしない」と報告し、成果物には数えない。
-- **NIV-05** 依存は `[dependencies]` に書く。`workspace`（作業場の中のパッケージ名の配列）と、`[dependencies.external.<名前>]`（外のもの。`source`、`version`、任意の `src`）。外の依存の `version` は完全な `x.y.z` だけを受ける。
+- **NIV-05** 依存は `[dependencies]` に書く。`workspace`（作業場の中のパッケージ名の配列）と、`[dependencies.external.<名前>]`（外のもの。`source`、`version`、任意の `src`、任意の `license`）。外の依存の `version` は完全な `x.y.z` だけを受ける。`license` を書かない外の依存は、SBOM では `NOASSERTION`、封じる印の成果物の閉包では NIV-20 で断られる。
 - **NIV-06** `[package]` の `root` は、この宣言が指すパッケージの根を宣言の置き場からの相対で示す。宣言を持たない既存のパッケージを作業場から指すために使う。`src`、`main`、Gleam の `root` などの相対パスは、この根から数える。
 
 作業場（`niuv.workspace.toml`）
@@ -32,7 +32,7 @@
 
 ロック（`niuv.lock`）
 
-- **NIV-11** `niuv lock` は `niuv.lock` を書く。中身は、ツール（版と実行ファイルの SHA-256）、作業場の中のパッケージ（作業場からの相対の場所と中身のハッシュ）、外の依存（取得元、版、中身のハッシュ）。中身のハッシュは、宣言したソースの木のファイル名と SHA-256 の並びの SHA-256 で、ビルドの出力・キャッシュ・`.git` は含めない。同じ入力からは同じバイト列を書く。
+- **NIV-11** `niuv lock` は `niuv.lock` を書く。中身は、ツール（版と実行ファイルの SHA-256）、作業場の中のパッケージ（作業場からの相対の場所と中身のハッシュ）、外の依存（取得元、版、中身のハッシュ）。中身のハッシュは、宣言したソースの木のファイル名と SHA-256 の並びの SHA-256 で、ビルドの出力・キャッシュ・`.git` は含めない。同じ入力からは同じバイト列を書く。ロックは作業場の全メンバーを覆うので、作業場は外の依存の名前ごとに 1 つの固定だけを持つ（メンバーが別々の閉包で同じ名前を別の版に固定していても `niuv lock` は断る）。
 - **NIV-12** `niuv build` は、ロックが無い、または閉包のどれかの場所・中身のハッシュがロックと違うとき、断る（`niuv lock` を促す）。
 - **NIV-13** `niuv build` は、実際のツールの版または実行ファイルの SHA-256 がロックと違えば断る。`via = "mise"` は実行ファイルを見つけるためだけに使い、ロックとの照合は同じにする。
 
@@ -43,15 +43,15 @@ Nim
 
 Gleam
 
-- **NIV-16** Gleam のビルドは `gleam build` に任せる。`gleam build` に作業場の中の `path` 依存を外から差し替える口は無いので、閉包の Gleam パッケージを置き場に写し、`path` を置き場の中の相対に書き換えた `gleam.toml` を置いてから `gleam build` を呼ぶ。作業場の外の `path` 依存（宣言に無いもの）は断る。
-- **NIV-17** 決まったバイト列: 置き場はビルドの入力のハッシュで名付けたディレクトリで、毎回作り直す。Erlang の FFI は `ERL_COMPILER_OPTIONS=deterministic` で作る。同じ入力を 2 つの違う場所から別々にビルドして、全 `.beam`（FFI を含む）の SHA-256 が一致する。
-- **NIV-18** 目録は成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`）・SHA-256・大きさを持ち、`nim-cbor-det` の決定的 CBOR で書く。署名はしない。同じ成果物からは同じバイト列。
-- **NIV-19** SBOM は閉包の各パッケージの名前・版・`license` を CycloneDX の部分集合（JSON）で出す。
-- **NIV-20** ライセンスの門: `sealed` 印の成果物を出すパッケージの閉包に GPL-3.0 / LGPL-3.0 / AGPL-3.0（SPDX の `-only`・`-or-later` の綴りを含む）が入れば、パッケージ名とライセンスを示して断る。`sealed` でない成果物では門は開いている（SBOM には載せる）。
+- **NIV-16** Gleam のコンパイルと Hex の取得は `gleam` に任せる。`gleam` に作業場の中の `path` 依存を外から差し替える口は無い（`gleam build` に旗は無く、低水準の `gleam compile-package` はコンパイル済みの `--lib` を要り、Hex の取得・展開・検証を呼び手に残す）ので、閉包の Gleam パッケージを置き場に 1 つずつ（`<置き場>/<gleam.toml の name>/`）写し、`path` を `../<name>` に書き換えた `gleam.toml`（と、根の `manifest.toml` の `local` の `path`）を置いてから、根で `gleam export erlang-shipment` を呼ぶ。`gleam build` でなく shipment を使う理由: `gleam build` の出力は根の `test/`・`dev/` と dev 依存を含み、配る物ではない。gleam.toml の `path` 依存が、閉包の Gleam パッケージのどれとも合わない、または宣言された場所と違う所を指すときは、断る。Hex の版は根の `manifest.toml`（gleam 自身のロック。その `outer_checksum` を含み、パッケージの中身のハッシュに入る）が決める。
+- **NIV-17** 決まったバイト列: 置き場は入力（ツールの版と実行ファイルの SHA-256、閉包の各 Gleam パッケージの中身のハッシュ）のハッシュで名付けたディレクトリで、毎回作り直す。`gleam` は `ERL_COMPILER_OPTIONS=deterministic` の下で呼び、利用者の環境の同名の変数は上書きする。同じ入力を、作業場の場所も置き場の根も違う 2 つの場所から別々にビルドして、出荷される全 `.beam`（Erlang の FFI と Hex のパッケージを含む）の SHA-256 が一致する。
+- **NIV-18** 目録は成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`）・SHA-256・大きさを持ち、`nim-cbor-det` の決定的 CBOR で書き、ビルドの出力先に `niuv.manifest.cbor` として置く。配置は `{1: 形式の版 (1), 2: パッケージ, 3: 版, 4: [{1: 名前, 2: 種類, 3: SHA-256 (32 バイト), 4: 大きさ}]}`、並びは種類・名前の順、場所は載せない。署名はしない。同じ成果物からは同じバイト列。Future: Gleam の `.app` ファイルは目録に入れていない（`.beam` だけ）。
+- **NIV-19** SBOM は閉包の各パッケージの名前・版・ライセンスを CycloneDX 1.5 の部分集合（JSON）で出し、ビルドの出力先に `niuv.sbom.cdx.json` として置く。作業場の中のパッケージは `[package] license`、外の依存は宣言の `license`（無ければ `NOASSERTION`）、`gleam` が取得した Hex のパッケージはそのパッケージ自身の `gleam.toml` の `licences` から取る。名前順で、同じ入力からは同じバイト列。
+- **NIV-20** ライセンスの門: `sealed` 印の成果物を出すビルドで、その言語の閉包（Nim の bin なら Nim のコードを出すパッケージと外の依存、Gleam なら Gleam のパッケージと Hex のパッケージ）に GPL-3.0 / LGPL-3.0 / AGPL-3.0（SPDX の `-only`・`-or-later`・`+` の綴りを含む）が入れば、パッケージ名とライセンスを示して断る。ライセンスが分からない（外の依存で `license` が無い）パッケージが入るときも断る。`OR` の式でも、v3 の copyleft が 1 つでも並んでいれば断る（どちら側を取るかは人の判断で、門の仕事ではない）。`sealed` でない成果物では門は開いている（SBOM には載せる）。宣言で分かる分は、どのコンパイラも走る前に判定する。Hex のパッケージは取得後に判定する。
 
 そのほか
 
-- **NIV-21** niuv は腐海の Nim の子としても呼べる: `niuv child` は `nim-frames` の枠で 1 つの頼み（ビルド）を受け、目録を返す。
+- **NIV-21** niuv は腐海の Nim の子としても呼べる: `niuv child` は `nim-frames` の枠（`runChild`）で 1 つの頼み（ビルド）を受け、目録のバイト列を返す。頼みは `{1: 種類（1 = ビルド）, 2: 作業場のファイル, 3: パッケージ名, 4: 出力先, 5: 置き場の根（任意）}`、返事は `ok {1: 目録のバイト列}`。失敗の番号は nim-frames の共通の番号: 頼みの形の誤りは malformed、知らない種類は unknown-kind、作業場・パッケージが無いのは not-found、宣言・ロック・ツール・ライセンス・版の衝突は refused、コンパイラや入出力の失敗は io。
 - **NIV-22** コマンドは `lock`、`check`、`build`、`child` だけを受ける。それ以外（`venv`、`activate`、`install` など）は、使い方を示して断る。
 
 ## 対象外（G0: 規範の文が仕様 ID に結ばれない理由）
@@ -66,10 +66,12 @@ Gleam
 
 ## 採らなかった案（コメントに書かない設計判断の置き場）
 
+- **fukai の `scripts/build.sh` と同じバイト列にそろえる**: niuv の出力は、同じ引数の `nim c`（設定ファイルを読まず、探索パスを旗で渡す）と一致することを確かめた（`fukai/store` と `fukai/keeper` の 4 つ）。`build.sh` の出力とは一致しない。理由は 2 つ。(1) nimcrypto・results が nimble の lazy な探索（`pkgs2`）で見つかると、モジュールの名前が `@nnimcrypto-0.7.3-<hash>@s…` になり、`--path` で指すと `@pnimcrypto@s…` になる。シンボル名が変わるので、実行ファイルが違う。(2) 設定ファイル（`nim.cfg`）を読むとコンパイラのファイル番号が 1 つずれ、`_Dl_<番号>_` のシンボル名と `LC_UUID` が変わる。そろえるには nimble の暗黙の探索を許すしかなく、NIV-14（宣言に無い依存は見つからない）に反する。そろえない。
+
 - **nimble に任せる**: nimble の lazy な pkgs2 は 0.2.6 しか持たず、BearSSL のように固定した版を別の場所から使うには `--path` の手書きが要る。nimble の暗黙の探索は、宣言に無い依存が通ってしまう（NIV-14 が閉じる）。
 - **`nim.cfg` を生成する**: 設定ファイルは周りのディレクトリの設定と重なり、どの旗が効いたかが見えない。旗は引数で渡し、ロックと目録に結ぶ。
 - **版の範囲と SAT**: 旧 niuv が持っていた。作業場の中は 1 つの版で、外の依存は固定する。範囲が要る使い手が現れるまで作らない。
-- **Gleam の `path` を `gleam.toml` の書き換えなしに渡す**: `gleam build` に口は無かった（NIV-16。確かめた内容は `docs/quality/spec-coverage.md` の注）。
+- **Gleam の `path` を `gleam.toml` の書き換えなしに渡す**: `gleam build --help` と `gleam compile-package --help`（gleam 1.19.1）を読んで確かめた限り、口は無い。`compile-package` で 1 パッケージずつ niuv が順に呼ぶ案は、Hex のパッケージの取得・展開・検証を niuv が持つことになる（車輪の再発明）ので採らない。
 - **外の依存の取得（git clone、hex）**: B7（網なしで 1 台で動く）に反する。探し場所に置かれた物を、取得元・版で選び、中身のハッシュで固定する。取得は `nimble` や人に任せる。
 
 ## 影響

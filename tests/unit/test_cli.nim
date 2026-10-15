@@ -2,7 +2,7 @@
 ## lock -> build that NIV-11, NIV-12, NIV-13 and NIV-15 describe from outside.
 
 import std/[os, osproc, strutils, unittest]
-import ../../src/niuv/cli
+import ../../src/niuv/[cli, hashing]
 import support
 
 const testFile* = "tests/unit/test_cli.nim"
@@ -134,3 +134,122 @@ suite "NIV-08 check through the command line":
     let r = runCli(@["check", "ghost", "--workspace", makeWorkspace(d, nimVersion())])
     check r.code != 0
     check "ghost" in r.stderr
+
+# ---- Gleam, manifest, SBOM and the license gate through the command line --
+
+import std/json
+import ../../src/niuv/[artifact, errors, manifest]
+
+proc makeMixed(dir: string, libLicense = "MIT", appNimSealed = false, appGleamSealed = false,
+               wasm = false): string =
+  ## `app` has a Nim bin and a Gleam package; both depend on `lib`.
+  let gleamV = realGleam().version
+  let erlV = realErlang().version
+  writeTree(dir, {
+    "app/niuv.toml": pkgToml("app", "\n[nim]\n[[nim.bin]]\nname = \"hello\"\nmain = \"child/hello.nim\"\n" &
+      "sealed = " & $appNimSealed & "\n[gleam]\nsealed = " & $appGleamSealed & "\n" &
+      (if wasm: "[wasm]\nentry = \"wasm/main.wat\"\n" else: "") &
+      "[dependencies]\nworkspace = [\"lib\"]\n"),
+    "app/child/hello.nim": "import greeter\necho greet(\"mixed\")\n",
+    "app/src/placeholder.nim": "discard",
+    "app/gleam.toml": "name = \"app\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\n\n[dependencies]\nlib_gl = { path = \"../lib\" }\n",
+    "app/src/app.gleam": "import lib_gl\n\npub fn run() -> Int {\n  lib_gl.answer()\n}\n",
+    "app/src/app_ffi.erl": "-module(app_ffi).\n-export([ping/0]).\nping() -> ok.\n",
+    "app/wasm/main.wat": "(module)\n",
+    "lib/niuv.toml": pkgToml("lib", "\n[nim]\n[gleam]\n").replace("Apache-2.0", libLicense),
+    "lib/src/greeter.nim": "proc greet*(n: string): string = \"hello \" & n\n",
+    "lib/gleam.toml": "name = \"lib_gl\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\n",
+    "lib/src/lib_gl.gleam": "pub fn answer() -> Int {\n  42\n}\n",
+    "niuv.workspace.toml": "[workspace]\nmembers = [\"app\", \"lib\"]\n[tools.nim]\nversion = \"" &
+      realNim().version & "\"\n[tools.gleam]\nversion = \"" & gleamV & "\"\n[tools.erlang]\nversion = \"" &
+      erlV & "\"\n"})
+  dir / "niuv.workspace.toml"
+
+proc buildMixed(d, w: string): CliResult =
+  runCli(@["build", "app", "--workspace", w, "--out", d / "out", "--stage", d / "stage"])
+
+suite "NIV-15 NIV-18 NIV-19 a mixed build writes a manifest and an SBOM":
+  test "Given a Nim bin and a Gleam package, When built, Then the manifest lists both kinds":
+    let d = freshDir("cli-mixed")
+    let w = makeMixed(d)
+    check runCli(@["lock", "--workspace", w]).code == 0
+    let r = buildMixed(d, w)
+    check r.code == 0
+    let m = decodeManifest(readFile(d / "out" / "niuv.manifest.cbor"))
+    check m.isOk
+    check m.get.package == "app"
+    var names: seq[string]
+    for e in m.get.entries: names.add $e.kind & ":" & e.name
+    for want in ["nim-child:hello", "beam:app", "beam:lib_gl", "beam:app_ffi"]:
+      check want in names
+    for e in m.get.entries:
+      let onDisk = if e.kind == akNimChild: d / "out" / e.name else: ""
+      if onDisk.len > 0: check sha256File(onDisk).get == e.sha256
+
+  test "Given a build, When the SBOM is read, Then it lists the packages with their licenses":
+    let d = freshDir("cli-sbom")
+    let w = makeMixed(d, libLicense = "BSD-3-Clause")
+    check runCli(@["lock", "--workspace", w]).code == 0
+    check buildMixed(d, w).code == 0
+    let j = parseJson(readFile(d / "out" / "niuv.sbom.cdx.json"))
+    check j["bomFormat"].getStr == "CycloneDX"
+    var found = false
+    for c in j["components"]:
+      if c["name"].getStr == "lib":
+        found = true
+        check c["licenses"][0]["license"]["id"].getStr == "BSD-3-Clause"
+    check found
+
+  test "Given the same build twice, When the manifests are compared, Then the bytes are equal":
+    let d = freshDir("cli-manifest-twice")
+    let w = makeMixed(d)
+    check runCli(@["lock", "--workspace", w]).code == 0
+    check buildMixed(d, w).code == 0
+    let first = readFile(d / "out" / "niuv.manifest.cbor")
+    removeDir(d / "out")
+    check buildMixed(d, w).code == 0
+    check readFile(d / "out" / "niuv.manifest.cbor") == first
+
+suite "NIV-20 license gate through the command line":
+  test "Given a sealed Nim bin and a GPL-3.0 package in the closure, When built, Then it is refused before any compile":
+    let d = freshDir("cli-gate-nim")
+    let w = makeMixed(d, libLicense = "GPL-3.0-only", appNimSealed = true)
+    check runCli(@["lock", "--workspace", w]).code == 0
+    let r = buildMixed(d, w)
+    check r.code != 0
+    check "lib" in r.stderr and "GPL-3.0-only" in r.stderr
+    check not fileExists(d / "out" / "hello")
+    check not dirExists(d / "out" / "beam")
+
+  test "Given a sealed Gleam package and a GPL-3.0 package in the closure, When built, Then it is refused before gleam runs":
+    let d = freshDir("cli-gate-gleam")
+    let w = makeMixed(d, libLicense = "AGPL-3.0-or-later", appGleamSealed = true)
+    check runCli(@["lock", "--workspace", w]).code == 0
+    let r = buildMixed(d, w)
+    check r.code != 0
+    check "AGPL-3.0-or-later" in r.stderr
+    check not dirExists(d / "stage")
+
+  test "Given GPL-3.0 and nothing sealed, When built, Then it builds and the SBOM carries the license":
+    let d = freshDir("cli-gate-open")
+    let w = makeMixed(d, libLicense = "GPL-3.0-only")
+    check runCli(@["lock", "--workspace", w]).code == 0
+    check buildMixed(d, w).code == 0
+    check "GPL-3.0-only" in readFile(d / "out" / "niuv.sbom.cdx.json")
+
+  test "Given a sealed bin and only permissive licenses, When built, Then it builds":
+    let d = freshDir("cli-gate-ok")
+    let w = makeMixed(d, libLicense = "MIT", appNimSealed = true, appGleamSealed = true)
+    check runCli(@["lock", "--workspace", w]).code == 0
+    check buildMixed(d, w).code == 0
+
+suite "NIV-04 wasm is declared, not built":
+  test "Given a wasm table, When built, Then the build says so and the manifest has no wasm entry":
+    let d = freshDir("cli-wasm")
+    let w = makeMixed(d, wasm = true)
+    check runCli(@["lock", "--workspace", w]).code == 0
+    let r = buildMixed(d, w)
+    check r.code == 0
+    check "wasm" in r.stdout and "not built" in r.stdout
+    for e in decodeManifest(readFile(d / "out" / "niuv.manifest.cbor")).get.entries:
+      check e.kind != akWasm

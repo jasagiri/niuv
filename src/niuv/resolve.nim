@@ -10,7 +10,7 @@ import ./[decl, errors, workspace]
 
 type
   ResolvedExternal* = object
-    name*, source*, version*, src*: string
+    name*, source*, version*, src*, license*: string
     dir*: string           ## the directory found in an external root (absolute)
     requiredBy*: string    ## the first package that asked for it
 
@@ -104,7 +104,7 @@ proc resolveClosure*(ws: Workspace, rootName: string): NResult[Closure] {.raises
             ", src " & e.src & ") required by '" & d.name & "'"))
       else:
         asked[e.name] = ResolvedExternal(name: e.name, source: e.source, version: e.version,
-                                         src: e.src, requiredBy: d.name)
+                                         src: e.src, license: e.license, requiredBy: d.name)
     done.add name
     closure.packages.add d
     ok()
@@ -115,7 +115,7 @@ proc resolveClosure*(ws: Workspace, rootName: string): NResult[Closure] {.raises
   names.sort()
   for n in names:
     var r = asked.getOrDefault(n)
-    r.dir = ?locateExternal(ExternalDep(name: r.name, source: r.source, version: r.version, src: r.src),
+    r.dir = ?locateExternal(ExternalDep(name: r.name, source: r.source, version: r.version, src: r.src, license: r.license),
                             ws.externalRoots)
     closure.externals.add r
   ok(closure)

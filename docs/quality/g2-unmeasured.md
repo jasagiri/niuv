@@ -13,3 +13,10 @@
 | src/niuv/nimbuild.nim | 未測定 |
 | src/niuv/build.nim | 未測定 |
 | src/niuv/cli.nim | 未測定 |
+| src/niuv/license.nim | 未測定 |
+| src/niuv/sbom.nim | 未測定 |
+| src/niuv/manifest.nim | 未測定 |
+| src/niuv/artifact.nim | 未測定 |
+| src/niuv/exec.nim | 未測定 |
+| src/niuv/gleambuild.nim | 未測定 |
+| src/niuv/child.nim | 未測定 |
