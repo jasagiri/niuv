@@ -1,0 +1,6 @@
+{
+  "nimVersion": "2.2.4",
+  "projectName": "test_project",
+  "parallelJobs": 4,
+  "verbose": true
+}
