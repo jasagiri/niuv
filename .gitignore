@@ -1,0 +1,62 @@
+# Build artifacts
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Nim cache
+nimcache/
+.nimcache/
+
+# Test artifacts
+testresults/
+htmldocs/
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependencies
+nimbledeps/
+
+# Coverage reports
+coverage/
+*.gcov
+*.gcda
+*.gcno
+lcov.info
+
+# Environment
+.env
+.env.local
+*.pid
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# niuv specific
+.niuv/
+testenv/
+niuv.lock
+
+# Archive/temporary
+_archive/
+config_backup_*/
+test_coverage_run*
+# Executables built at the root (kept on disk, not versioned)
+/niuv
+/niuv_enhanced
+/niuv_path_fixer
+*.dSYM/

@@ -1,0 +1,68 @@
+# Niuv Example Configuration File
+
+[tool.niuv]
+# Nim version to use (recommended to match your project requirements)
+nim_version = "2.0.0"
+
+# Directory for Nimble packages (relative to project root)
+nimble_dir = ".niuv/deps"
+
+# Lockfile path (relative to project root)
+lockfile = "nimble.lock"
+
+# Enable automatic lockfile generation
+auto_lock = true
+
+# Number of parallel jobs for installation (0 = use all CPU cores)
+parallel_jobs = 4
+
+# Enable verbose output
+verbose_output = false
+
+# Enable shell integration
+shell_integration = true
+
+# Cache directory (can be a relative or absolute path)
+# cache_dir = ".niuv/cache"
+
+# Custom environment variables to set when activating the environment
+# [tool.niuv.env_vars]
+# NIM_LIB_PATH = "./lib"
+# CUSTOM_VAR = "value"
+
+# Testing configuration
+[tool.niuv.testing]
+# Test backend to use: "niuv" (default) or "testkit"
+backend = "niuv"
+
+# Test output directory
+output_dir = "build/test_output"
+
+# Generate test reports
+generate_report = true
+
+# Test file pattern
+pattern = "test_*.nim"
+
+# Stop on first test failure
+fail_fast = false
+
+# Test categories (when using testkit backend)
+[tool.niuv.testing.categories]
+enabled = ["unit", "integration", "system", "performance"]
+custom = ["security", "compatibility"]
+
+# MECE (Mutually Exclusive, Collectively Exhaustive) analysis
+[tool.niuv.testing.mece]
+# Enable MECE analysis for test structure
+enabled = true
+
+# Strict mode - fail if MECE violations are found
+strict = false
+
+# Custom test organization paths
+[tool.niuv.testing.paths]
+unit = "tests/unit"
+integration = "tests/integration"
+system = "tests/system"
+performance = "tests/performance"

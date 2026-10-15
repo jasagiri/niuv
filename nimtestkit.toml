@@ -1,0 +1,20 @@
+# nim-testkit configuration for niuv
+[test]
+# Test discovery
+testDir = "tests"
+pattern = "test_*.nim"
+parallel = false
+timeout = 300
+
+# Coverage settings
+[coverage]
+enabled = true
+threshold = 80.0
+outputDir = "build/coverage"
+formats = ["html", "json"]
+
+# Reporting
+[reporting]
+verbose = false
+showTiming = true
+showMemory = false

@@ -1,0 +1,59 @@
+name: ShellSpec Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'scripts/**/*.sh'
+      - 'spec/**/*.sh'
+      - '.shellspec'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scripts/**/*.sh'
+      - 'spec/**/*.sh'
+      - '.shellspec'
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        shell: [bash, sh]
+        
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install ShellSpec
+      run: |
+        curl -fsSL https://git.io/shellspec | sh -s -- --yes
+        echo "${HOME}/.local/bin" >> $GITHUB_PATH
+        
+    - name: Install kcov (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y kcov
+        
+    - name: Install kcov (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install kcov || true
+        
+    - name: Run ShellSpec tests
+      run: |
+        shellspec --shell ${{ matrix.shell }}
+        
+    - name: Run with coverage
+      if: matrix.os == 'ubuntu-latest' && matrix.shell == 'bash'
+      run: |
+        scripts/run_shellspec.sh --coverage
+        
+    - name: Upload coverage
+      if: matrix.os == 'ubuntu-latest' && matrix.shell == 'bash'
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage/index.html
+        flags: shellspec
+        name: shellspec-coverage
