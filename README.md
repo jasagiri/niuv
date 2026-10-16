@@ -62,7 +62,7 @@ niuv child                                   # nim-frames の枠で 1 つのビ�
 
 - fukai の各リポジトリは、まだ `scripts/build.sh` と手書きの `nim.cfg` でビルドしている。niuv の宣言はそれらのリポジトリに置いていない。`fukai/store`・`fukai/keeper` の 4 つの実行ファイルは、niuv と `build.sh` で同じソースの組をコンパイルし、記号の名前だけが違う（ADR の「採らなかった案」）
 - `fukai/delivery` が niuv を実際に使っている。公開のエージェントは `niuv child` にビルドを頼み、Nim の子は `niuv/manifest` で目録を読む。delivery の試験は見本のプロダクトを `niuv lock` で固定し、その実ビルドで公開・取り込み・入れ替えまで通す
-- **旧 niuv の形の `niuv.toml` が、ほかのリポジトリに残っている**（`[project]`、`[tasks]`、`[environment]` などの節。2026-10-16 の時点で `hourai/`、`hourai/config/`、`products/information-gateway/`、`services/kumihimo-editor/`、`foundation/` の `wired-kernel`・`社内の描画器`・`nim-language-intelligence`・`nim-shell-unicode-patch`・`shikibu-ime`）。新しい niuv は、作業場に並べられたときにだけ読み、知らない節・キーとして場所を示して断る（NIV-01）。作業場に並べない限り、そのリポジトリには何もしない。書き換えるかは、そのリポジトリを niuv でビルドすると決めたときに、そのリポジトリの側で決める
+- 旧 niuv の形の `niuv.toml`（`[project]`、`[tasks]`、`[environment]`、版の範囲などを持つもの）は、2026-10-16 にほかのリポジトリから消した（32 か所。各リポジトリの jj に「chore: remove the legacy-form niuv.toml」のコミットがある）。もし見つけたら、新しい niuv は作業場に並べられたときに、知らない節・キーとして場所を示して断る（NIV-01）。それらのリポジトリの文書やスクリプトには、旧 niuv への言及が残っているものがある
 
 ## 確かめていること・いないこと
 
