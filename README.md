@@ -2,9 +2,48 @@
 
 Nim・Gleam（・WASM）の多言語ビルドの道具。パッケージごとの宣言（`niuv.toml`）と作業場（`niuv.workspace.toml`）から、依存の閉包を解決し、ロック（`niuv.lock`）に固定し、`nim` と `gleam` を呼んでビルドし、成果物の目録（決定的 CBOR）と SBOM を出す。`sealed` 印の成果物に GPL-3.0・LGPL-3.0・AGPL-3.0 が入るときは断る。
 
-腐海（fukai）を知らない。鍵・署名・封じる・網は持たない。配る側は `fukai/delivery`（別のリポジトリ）が担う。
+規則は [ADR-NIUV-0001](docs/adr/ADR-NIUV-0001.md)（NIV-01〜23、Status: proposed）、規則とテストの対応は [docs/quality/spec-coverage.md](docs/quality/spec-coverage.md)。設計の出どころは `fukai/docs/build-and-delivery.md`。
 
-設計の出どころは `fukai/docs/build-and-delivery.md`、規則は [ADR-NIUV-0001](docs/adr/ADR-NIUV-0001.md)（Status: proposed）、規則とテストの対応は [docs/quality/spec-coverage.md](docs/quality/spec-coverage.md)。
+## 位置付け
+
+niuv は **ビルド** だけを受け持つ。**配る**（公開、鍵の付与、取り寄せ、実体化、入れ替え）は `fukai/delivery` が受け持つ。2 つに分けたのは `build-and-delivery.md` の問い 1 の決定（案 C）による。
+
+```
+  foundation/niuv（Nim。腐海を知らない）
+    niuv.toml ─► 解決 ─► niuv.lock ─► nim / gleam ─► 成果物 ＋ 目録(未署名) ＋ SBOM
+                                                           │
+  ─────────────────────────────────────────────────────────┼──── ここから腐海
+                                                           ▼
+  fukai/delivery（Gleam のエージェント＋Nim の子）
+    公開: 目録から頭を作り keeper の鍵の子で署名、成果物を release の期の鍵で封じる
+    付与: 島の表で読み手の機械にだけ期の鍵を包む
+    取り込み: 署名を確かめ、差分の断片を取り寄せ、平文の SHA-256 を照らして置く
+    入れ替えの司令役: BEAM は動いたまま入れ替え（gl-upgrade-coordinator）、Nim の子は起こし直す
+```
+
+| | niuv | fukai/delivery |
+|---|---|---|
+| 置き場 | `foundation/`（腐海の外） | `fukai/` |
+| 判断 | 持たない（宣言どおりにビルドするだけ） | 持つ（何を公開し、だれに渡し、どの版へ移るか。列に書いてから行う） |
+| 鍵・署名・封じる・網 | 持たない | 持つ（`fukai/store`、`fukai/keeper`、`fukai/islands` を使う） |
+| 腐海が止まっていても | 1 台で、網なしで動く | 動かない |
+
+ビルドを fukai に置かない理由（`build-and-delivery.md` 3.1）:
+
+1. ビルドする物の大半は foundation のパッケージで、ビルドの道具は fukai の外を読む
+2. 島のノード自身をビルドするのに、島のノードが動いていることを前提にできない（鶏と卵）
+3. 汎用の部品を fukai に置かない（Ecosystem Boundaries）
+
+## 使い手との約束
+
+配る側が頼っている形。変えるときは使い手（いまは `fukai/delivery`）と一緒に変える。
+
+| 約束 | 規則 | 使い手 |
+|---|---|---|
+| 目録 `niuv.manifest.cbor`: 成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`）・SHA-256・大きさ。場所は載せない。署名しない | NIV-18 | delivery は Nim から `niuv/manifest` を読み、目録から署名する頭を作る（目録そのものは署名しない。平文の SHA-256 を頭に出さないため） |
+| 置き場: Nim の実行ファイルは `<out>/<bin 名>`、Gleam の `.beam` は `<out>/beam/<アプリ>/<モジュール>.beam` | NIV-15、NIV-23 | delivery は目録の名前と SHA-256 で成果物を探して照らす |
+| 決まったバイト列: 同じ入力からは、置いた場所によらず同じ `.beam` | NIV-17 | 版の差分（変わったモジュールだけを取る）が成り立つ前提 |
+| 腐海の Nim の子としての入口: `niuv child` は nim-frames の枠で 1 つのビルドの頼みを受け、目録のバイト列を返す | NIV-21 | delivery の公開のエージェントが `niuv child` を子として起こし、ビルドを頼む（ロックは人か試験が `niuv lock` で作る） |
 
 ## 使い方
 
@@ -15,18 +54,25 @@ niuv build <package> [--out DIR] [--bin NAME]... [--stage DIR]
 niuv child                                   # nim-frames の枠で 1 つのビルドの頼みを受ける（腐海の子）
 ```
 
-`build` はロックが無い・古い、ツールの版か実行ファイルがロックと違う、閉包に同じ外の依存が 2 つの版で来る、のどれかで断る。出力先には成果物（Nim の実行ファイルは `<bin 名>`、Gleam の `.beam` は `beam/<app>/`）、`niuv.manifest.cbor`、`niuv.sbom.cdx.json` が置かれる。
+`build` はロックが無い・古い、ツールの版か実行ファイルがロックと違う、閉包に同じ外の依存が 2 つの版で来る、のどれかで断る。出力先には成果物と `niuv.manifest.cbor`、`niuv.sbom.cdx.json` だけが置かれ、コンパイラの作業場（nimcache）と Gleam の写しは置き場の根（`--stage`、既定は一時ディレクトリの `niuv-stage`）の下に置かれる。
 
-宣言と作業場の書き方は ADR の NIV-01〜NIV-07、例は `tests/unit/` の各ファイルの先頭にある。
+宣言と作業場の書き方は ADR の NIV-01〜NIV-07、例は `tests/unit/` の各ファイルの先頭にある。宣言を持たない既存のパッケージは、作業場の側の宣言から `[package] root` で指す（NIV-06）。
+
+## いまの使われ方（2026-10-16）
+
+- fukai の各リポジトリは、まだ `scripts/build.sh` と手書きの `nim.cfg` でビルドしている。niuv の宣言はそれらのリポジトリに置いていない。`fukai/store`・`fukai/keeper` の 4 つの実行ファイルは、niuv と `build.sh` で同じソースの組をコンパイルし、記号の名前だけが違う（ADR の「採らなかった案」）
+- `fukai/delivery` が niuv を実際に使っている。公開のエージェントは `niuv child` にビルドを頼み、Nim の子は `niuv/manifest` で目録を読む。delivery の試験は見本のプロダクトを `niuv lock` で固定し、その実ビルドで公開・取り込み・入れ替えまで通す
+- **旧 niuv の形の `niuv.toml` が、ほかのリポジトリに残っている**（`[project]`、`[tasks]`、`[environment]` などの節。2026-10-16 の時点で `hourai/`、`hourai/config/`、`products/information-gateway/`、`services/kumihimo-editor/`、`foundation/` の `wired-kernel`・`社内の描画器`・`nim-language-intelligence`・`nim-shell-unicode-patch`・`shikibu-ime`）。新しい niuv は、作業場に並べられたときにだけ読み、知らない節・キーとして場所を示して断る（NIV-01）。作業場に並べない限り、そのリポジトリには何もしない。書き換えるかは、そのリポジトリを niuv でビルドすると決めたときに、そのリポジトリの側で決める
 
 ## 確かめていること・いないこと
 
-- Nim: 同じ引数の `nim c` と同じバイト列ができる（設定ファイルと nimble の暗黙の探索を使わない）。fukai の `scripts/build.sh` の出力とは一致しない。理由は ADR の「採らなかった案」
+- Nim: 同じ引数の `nim c` と同じバイト列ができる（設定ファイルと nimble の暗黙の探索を使わない）
 - Gleam: 場所の違う 2 か所からビルドして、出荷される全 `.beam`（Erlang の FFI と Hex のパッケージを含む）の SHA-256 が一致する（`tests/acceptance/test_fukai_agent.nim` で実物の `fukai/agent` を、`tests/unit/test_gleambuild.nim` で小さな例を）
+- テスト: `tests/test_all.nim` で 191 件（警告 0）。`tests/acceptance/` は兄弟のリポジトリを読むので、その外で手で流す
 - 確かめていない: Linux・Windows、gleam 1.19.1 と OTP 29.1.1 以外の版、`gleam` が Hex から取得する経路（Hex のキャッシュにある版だけで確かめた）、変異検査（`docs/quality/g2-unmeasured.md`）
 
 ## 持たない物
 
-仮想環境、`activate`、シェルの統合、MCP、版の範囲の解決（SAT）、外の依存の取得（git clone・hex）、WASM のコンパイル手順（`[wasm]` は宣言の形を検証するだけで、ビルドは「宣言のみ」と報告する）。理由は ADR の「対象外」と「採らなかった案」。Future: `.app` ファイルの目録への掲載、`OR` 式のライセンスでどちらを取るかの宣言。
+仮想環境、`activate`、シェルの統合、MCP、版の範囲の解決（SAT）、外の依存の取得（git clone・hex）、WASM のコンパイル手順（`[wasm]` は宣言の形を検証するだけで、ビルドは「宣言のみ」と報告する）、鍵・署名・封じる・網。理由は ADR の「対象外」と「採らなかった案」。Future: `.app` ファイルの目録への掲載、`OR` 式のライセンスでどちらを取るかの宣言。
 
-旧 niuv（Nim の仮想環境の管理）の中身は jj のコミット `f06a84e1` に残してあり、消した物の一覧は [docs/removed-2026-10-16.md](docs/removed-2026-10-16.md)。
+旧 niuv（Nim の仮想環境の管理）の中身は jj のコミット `f06a84e1` と `88aacec2` に残してあり、消した物の一覧と読み戻し方は [docs/removed-2026-10-16.md](docs/removed-2026-10-16.md)。
