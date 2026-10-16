@@ -39,11 +39,11 @@
 Nim
 
 - **NIV-14** Nim のビルドは、閉包の探索パスを `--path` の旗で渡し、`--noNimblePath`、`--skipUserCfg`、`--skipParentCfg`、`--skipProjCfg` で nimble の暗黙の探索と周りの設定ファイルを使わない。宣言に無い依存の import は、解決されずにコンパイルが失敗する。
-- **NIV-15** `niuv build <パッケージ>` は宣言した各 `[[nim.bin]]` をビルドし、`--out` の下に名前で置く。コンパイラが失敗したら、その出力を付けて失敗を返す。
+- **NIV-15** `niuv build <パッケージ>` は宣言した各 `[[nim.bin]]` をビルドし、`--out` の下に名前で置く。`--out` には成果物と目録・SBOM だけを置き、コンパイラの作業場（nimcache）は置き場の根の下に、出力先と bin ごとに分けて置く。コンパイラが失敗したら、その出力を付けて失敗を返す。
 
 Gleam
 
-- **NIV-16** Gleam のコンパイルと Hex の取得は `gleam` に任せる。`gleam` に作業場の中の `path` 依存を外から差し替える口は無い（`gleam build` に旗は無く、低水準の `gleam compile-package` はコンパイル済みの `--lib` を要り、Hex の取得・展開・検証を呼び手に残す）ので、閉包の Gleam パッケージを置き場に 1 つずつ（`<置き場>/<gleam.toml の name>/`）写し、`path` を `../<name>` に書き換えた `gleam.toml`（と、根の `manifest.toml` の `local` の `path`）を置いてから、根で `gleam export erlang-shipment` を呼ぶ。`gleam build` でなく shipment を使う理由: `gleam build` の出力は根の `test/`・`dev/` と dev 依存を含み、配る物ではない。gleam.toml の `path` 依存が、閉包の Gleam パッケージのどれとも合わない、または宣言された場所と違う所を指すときは、断る。Hex の版は根の `manifest.toml`（gleam 自身のロック。その `outer_checksum` を含み、パッケージの中身のハッシュに入る）が決める。
+- **NIV-16** Gleam のコンパイルと Hex の取得は `gleam` に任せる。`gleam` に作業場の中の `path` 依存を外から差し替える口は無い（`gleam build` に旗は無く、低水準の `gleam compile-package` はコンパイル済みの `--lib` を要り、Hex の取得・展開・検証を呼び手に残す）ので、閉包の Gleam パッケージを置き場に 1 つずつ（`<置き場>/<gleam.toml の name>/`）写し、`path` を `../<name>` に書き換えた `gleam.toml`（と、根の `manifest.toml` の `local` の `path`）を置いてから、根で `gleam export erlang-shipment` を呼ぶ。`gleam build` でなく shipment を使う理由: `gleam build` の出力は根の `test/`・`dev/` と dev 依存を含み、配る物ではない。gleam.toml の `path` 依存（相対ならそのパッケージから数え、絶対ならそのまま）が、閉包の Gleam パッケージのどれとも合わない、または宣言された場所と違う所を指すときは、断る。Hex の版は根の `manifest.toml`（gleam 自身のロック。その `outer_checksum` を含み、パッケージの中身のハッシュに入る）が決める。
 - **NIV-17** 決まったバイト列: 置き場は入力（ツールの版と実行ファイルの SHA-256、閉包の各 Gleam パッケージの中身のハッシュ）のハッシュで名付けたディレクトリで、毎回作り直す。`gleam` は `ERL_COMPILER_OPTIONS=deterministic` の下で呼び、利用者の環境の同名の変数は上書きする。同じ入力を、作業場の場所も置き場の根も違う 2 つの場所から別々にビルドして、出荷される全 `.beam`（Erlang の FFI と Hex のパッケージを含む）の SHA-256 が一致する。
 - **NIV-18** 目録は成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`）・SHA-256・大きさを持ち、`nim-cbor-det` の決定的 CBOR で書き、ビルドの出力先に `niuv.manifest.cbor` として置く。配置は `{1: 形式の版 (1), 2: パッケージ, 3: 版, 4: [{1: 名前, 2: 種類, 3: SHA-256 (32 バイト), 4: 大きさ}]}`、並びは種類・名前の順、場所は載せない。署名はしない。同じ成果物からは同じバイト列。Future: Gleam の `.app` ファイルは目録に入れていない（`.beam` だけ）。
 - **NIV-19** SBOM は閉包の各パッケージの名前・版・ライセンスを CycloneDX 1.5 の部分集合（JSON）で出し、ビルドの出力先に `niuv.sbom.cdx.json` として置く。作業場の中のパッケージは `[package] license`、外の依存は宣言の `license`（無ければ `NOASSERTION`）、`gleam` が取得した Hex のパッケージはそのパッケージ自身の `gleam.toml` の `licences` から取る。名前順で、同じ入力からは同じバイト列。

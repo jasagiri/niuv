@@ -33,7 +33,7 @@ echo greet("niuv"), " ", extName()
 
 proc build(d: string, ws: Workspace, only: seq[string] = @[]): NResult[seq[Artifact]] =
   let c = resolveClosure(ws, "app").get
-  buildNim(realNim(), c, d / "out", only)
+  buildNim(realNim(), c, d / "out", d / "stage", only)
 
 suite "NIV-14 nim plumbing":
   test "Given a closure, When the arguments are made, Then every src and external is a --path":
@@ -117,6 +117,14 @@ suite "NIV-15 nim build":
     check a.size == getFileSize(a.path)
     check a.sha256.len == 64
     check not a.sealed
+
+  test "Given a bin, When built, Then out holds the bin alone and the compiler's cache is under the stage root":
+    let d = freshDir("nim-outonly")
+    check build(d, makeWorkspace(d)).isOk
+    var inOut: seq[string]
+    for f in walkDirRec(d / "out", relative = true): inOut.add f
+    check inOut == @["hello"]
+    check dirExists(d / "stage")
 
   test "Given a sealed bin, When built, Then the artifact is marked sealed":
     let d = freshDir("nim-sealed")

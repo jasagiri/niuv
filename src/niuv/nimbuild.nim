@@ -4,7 +4,7 @@
 ## config.nims or nimble: what is not declared is not found.
 
 import std/[os, sequtils]
-import ./[artifact, decl, errors, exec, resolve, toolchain]
+import ./[artifact, decl, errors, exec, hashing, resolve, toolchain]
 
 const
   MaxCompilerOutput = 8192
@@ -25,10 +25,12 @@ proc nimArgs*(c: Closure, root: PackageDecl, bin: NimBin, nimcache, outFile: str
 proc tail(s: string, n: int): string {.raises: [].} =
   if s.len <= n: s else: "..." & s[s.len - n .. ^1]
 
-proc buildNim*(nim: ToolInfo, c: Closure, outDir: string,
+proc buildNim*(nim: ToolInfo, c: Closure, outDir, stageRoot: string,
                only: seq[string] = @[]): NResult[seq[Artifact]] {.raises: [].} =
   ## Builds the bins of the closure's root package (all, or the ones named in
-  ## `only`) into `outDir`, one file per bin, named for the bin.
+  ## `only`) into `outDir`, one file per bin, named for the bin. The compiler's
+  ## cache sits under `stageRoot`, one per output directory and bin, so `outDir`
+  ## holds the shipped files only and two outputs never share a cache.
   var root: PackageDecl
   for p in c.packages:
     if p.name == c.root: root = p
@@ -43,7 +45,13 @@ proc buildNim*(nim: ToolInfo, c: Closure, outDir: string,
   for bin in root.nim.bins:
     if only.len > 0 and bin.name notin only: continue
     let outFile = outDir / bin.name
-    let args = nimArgs(c, root, bin, outDir / "nimcache" / bin.name, outFile)
+    var outAbs: string
+    try:
+      outAbs = absolutePath(outDir)
+    except CatchableError as e:
+      return err(niuvError(ekIo, outDir & ": " & e.msg))
+    let cache = stageRoot / "nimcache" / sha256Hex(outAbs)[0 ..< 16] / bin.name
+    let args = nimArgs(c, root, bin, cache, outFile)
     let r = ?runProcess(nim.exe, args, workDir = root.root)
     if r.code != 0:
       return err(niuvError(ekBuild, "nim failed for bin '" & bin.name & "' of '" & c.root &

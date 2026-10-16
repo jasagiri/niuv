@@ -64,7 +64,7 @@ proc buildPackage*(ws: Workspace, package: string, outDir: string, stageRoot: st
 
   var comps = nimComponents(closure)
   if buildsNim:
-    outcome.artifacts.add ?buildNim(tool("nim"), closure, outDir, only)
+    outcome.artifacts.add ?buildNim(tool("nim"), closure, outDir, stageRoot, only)
   if buildsGleam:
     let g = ?buildGleam(tool("gleam"), tool("erlang"), closure, outDir, stageRoot)
     ?checkLicenses(g.hex, root.gleam.sealed, package)

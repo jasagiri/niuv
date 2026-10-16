@@ -66,6 +66,11 @@ proc readPackage(d: PackageDecl): NResult[GleamPackage] {.raises: [].} =
         p.pathDeps.add (dep: dep, path: strOf(v.tableVal, "path"))
   ok(p)
 
+proc pathDepDir(p: GleamPackage, path: string): string {.raises: [].} =
+  ## Where a gleam.toml path dependency points: relative to the package, or
+  ## as written when absolute (os.`/` would glue it under the package).
+  if isAbsolute(path): normalizedPath(path) else: normalizedPath(p.dir / path)
+
 proc validate(pkgs: seq[GleamPackage], root: string): NResult[void] {.raises: [].} =
   ## Every path dependency of a Gleam package must be a Gleam package of the
   ## closure, at the place niuv.toml says. Otherwise the staged copy would
@@ -79,9 +84,9 @@ proc validate(pkgs: seq[GleamPackage], root: string): NResult[void] {.raises: []
       let found = pkgs.filterIt(it.name == pd.dep)
       if found.len == 0:
         return buildErr[void]("gleam.toml of '" & p.name & "' has a path dependency '" & pd.dep & "' (" &
-          p.dir / pd.path & ") that is no Gleam package of the closure of '" & root &
+          p.pathDepDir(pd.path) & ") that is no Gleam package of the closure of '" & root &
           "'; add its package to [dependencies].workspace in niuv.toml")
-      let wanted = normalizedPath(p.dir / pd.path)
+      let wanted = p.pathDepDir(pd.path)
       if wanted != found[0].dir:
         return buildErr[void]("gleam.toml of '" & p.name & "' points '" & pd.dep & "' at " & wanted &
           " but the workspace package '" & found[0].decl.name & "' is at " & found[0].dir)

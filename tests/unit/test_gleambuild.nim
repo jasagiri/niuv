@@ -94,6 +94,20 @@ suite "NIV-16 gleam plumbing":
     check "lib_gl" in r.error.msg
     check "niuv.toml" in r.error.msg
 
+  test "Given an absolute path to the workspace package of that name, When built, Then it is accepted":
+    let d = freshDir("gl-abspath")
+    let ws = makeWorkspace(d, appGleamDeps = "lib_gl = { path = \"" & (d / "deep" / "lib") & "\" }\n")
+    let r = build(d, ws, d / "stage")
+    check r.isOk
+    check "lib_gl" in r.get.artifacts.mapIt(it.name)
+
+  test "Given an absolute path that points elsewhere, When built, Then it is refused naming that path":
+    let d = freshDir("gl-abselse")
+    let ws = makeWorkspace(d, appGleamDeps = "lib_gl = { path = \"" & (d / "somewhere") & "\" }\n")
+    let r = build(d, ws, d / "stage")
+    check r.isErr
+    check (" at " & (d / "somewhere") & " ") in r.error.msg
+
   test "Given a path that points elsewhere than the workspace package of that name, When built, Then it is refused":
     let d = freshDir("gl-elsewhere")
     let ws = makeWorkspace(d, appGleamDeps = "lib_gl = { path = \"../somewhere/else\" }\n")
