@@ -1,0 +1,4 @@
+nim: Nim Compiler Version 2.2.12 [Linux: arm64]
+otp_version: 29.1.1
+erts: erts-17.1
+gleam: gleam 1.19.1

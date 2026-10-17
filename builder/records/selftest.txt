@@ -1,0 +1,14 @@
+ok   nim: Nim Compiler Version 2.2.12 [Linux: arm64]
+ok   otp_release: 29
+ok   otp_version: 29.1.1
+ok   erts: erts 17.1
+ok   gleam: gleam 1.19.1
+ok   niuv_help: usage: niuv <command> [options]
+ok   niuv_help_exit: 0
+ok   nim_compile: built-by-nim
+ok   erlc_compile: built_by_erlc
+ok   work_visible: name = "niuv"
+ok   work_read_only: refused
+ok   out_writable: written
+ok   no_network: only lo
+RESULT ok

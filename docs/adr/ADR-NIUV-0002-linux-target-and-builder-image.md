@@ -1,6 +1,6 @@
 # ADR-NIUV-0002: Linux の目標は、署名したビルド用の像の中で、その場の目標として作る
 
-**Status**: proposed
+**Status**: accepted（2026-10-17、jasagiri が「決めてほしい点」を推奨どおり承認。fukai roadmap 0.1 章 119・120。K4-1 の結果を反映）
 **Date**: 2026-10-17
 **出どころ**: fukai `docs/roadmap.md` 0.1 章 119（jasagiri、2026-10-17: Linux 向けのビルドは kite のゲストの中で行い、ゲストの OTP は 29.1.1 にそろえる。範囲は arm64 の Linux だけ）。段 K4（`fukai/docs/fukai-on-kite.md` 6 章）。K1 の測定（同 5.1 章。musl の Nim 2.2.12 で `column_child` などが動き、ホストの OTP 29 の beam はゲストの OTP 27 で `badfile`）。
 **仮説の層**: 実装（ビルドの環境をロックに結ぶ。価値・行動の仮説は 119 で決着済み）。支配軸: リスク・不確実性（ビルドの環境が動くと、NIV-17 の前提がロックの外で崩れる）。想定する失敗: 早合点（`niuv build` が完走したことを、署名した像の中で作れたことと等価視する）、名ばかりの完了（「像を固定した」と書いて、ロックにも検査にも digest が無い）、取らぬ狸の拡張点（x86 や別の libc の目標を、使い手のいない今に作る）。
@@ -111,7 +111,23 @@ K1 で、Linux のゲストの中なら musl の Nim 2.2.12 で fukai の子が�
 
 K4-3 は、完走でなく、試験の件数で確かめる（早合点を避ける）。
 
+## K4-1 の結果（2026-10-17）
+
+`builder/` に像の作り方を置き、podman で作り、kite に取り込んで署名し、ゲストで起動して確かめた。記録は `builder/records/` と `builder/README.md`。
+
+- **合格の形**: 署名した像が kite のゲスト（網なし、作業場を `--mount` で読み取り専用、出力先を書ける）で起動し、`builder-selftest`（`builder/selftest.sh`）が終了コード 0 で終わった。`nim -v` は 2.2.12、OTP は 29（`OTP_VERSION` 29.1.1、erts 17.1）、`gleam --version` は 1.19.1、`niuv --help` は終了コード 0。加えて、Nim が C にコンパイルして実行でき、`erlc` が beam を作れ、読み取り専用の mount に書けず、ネットワークの機器が `lo` だけ、を同じ実行で確かめた。
+- **上流の照合**: 3 つの tarball の SHA-256 は ADR の値と一致した（Nim `2639a06a…`、OTP `054e0143…`、gleam `b0eeed8c…`。gleam は取った tarball を実際にハッシュして公開の `.sha256` と照合）。違う値を渡すと、ホストの `verify-inputs.sh` が終了コード 1 で止まり（`builder/test/test_verify.sh`）、`Containerfile` の最初の段（`sha256sum -c`）も、1 桁違えた一覧で `podman build` が止まる。像の中で長い段に入る前に止まる。
+- **podman の層は tar+gzip**（K4-0 の確認どおり）で、`kite import` が受けた。署名の名前は `niuv/builder-k4`（`/` を含む）で、`kite_sign image` と `kite run --image` がそのまま通った。
+- **署名は開発用の鍵**。像の鍵の儀式（fukai roadmap 118）はまだ無いので、kite の `dev_keys` に登録した鍵で署名した。実行のたびに kite が「development key で署名された」と警告する。本物の鍵の儀式ができるまで、`[builder]` に書く digest は開発用の鍵で署名した像のもの。儀式ができたら、同じ像を本物の鍵で署名し直す（像の digest は変わらない）。
+- **像は作るたびに digest が変わる**（層に時刻が入る。同じ入力で 2 回作り、マニフェストの digest が違った）。したがって `[builder]` の pin は「作り直せる」ことでなく「この digest の像」を固定する。それが NIV-26 の設計どおりで、像の再現（同じ digest を作り直す）は約束しない。
+- **時間と大きさ**（podman の VM は 4 CPU・6 GiB。Nim と OTP の段は並んで走る）: キャッシュなしの全部の作り直しで 397 秒（`podman build`）。像は、展開後 403,273,456 バイト、層の圧縮後の合計 173,618,888 バイト、層 11 枚。ゲストでの起動から終了まで 108 秒（層の展開を含む）。
+- **入った物**: apk の版は `builder/records/apk-info.txt`（38 件。gcc 15.2.0-r5、musl 1.2.6-r2、libcrypto3 3.5.8-r0、alpine-release 3.24.2-r0 など）。実行ファイルの SHA-256 は `builder/records/exe-sha256.txt`。
+
+この段で確かめていないこと: ゲストの中での niuv の試験の実行（K4-3）、offline の gleam、像を同じ digest で作り直せるか（約束しない）、sigstore の検証（Future）、`erlc` が出す beam がホストの OTP 29.1.1 のものと一致するか（K4-4）。
+
 ## 決めてほしい点
+
+（2026-10-17、jasagiri が 1〜9 を推奨どおり承認。以下は承認された案の理由として残す。）
 
 1. **置き場**: 目標・目標別のロック・ビルド用の像の作り方（`builder/`）・kite を呼ぶ口を niuv に置く。この境界でよいか。推奨は**よい**。境界の判断: 汎用のビルドの道具の責務で、腐海の知識を持たない。kite の変更（`--mount` の VZ の実装、像の取り込み）は kite の責務で、別の ADR。腐海の基盤の実行用の像は K5 で fukai 側。違うと見る場合は、`builder/` だけを別のリポジトリにする案があるが、いま使い手が 1 つなので推奨しない。
 2. **kite の前提の追加（K4-0）**: `--mount` の VZ の実装と像の取り込みを kite に足す。推奨は**足す**。足さずに `kite_upper` に写す案は、ゲストが書ける場所にソースを置くので推奨しない。
@@ -144,4 +160,4 @@ K4-3 は、完走でなく、試験の件数で確かめる（早合点を避け
 - niuv: `toolchain.nim`（`kite` を既知のツールに）、`lock.nim`（目標別のファイル、`[builder]`）、`manifest.nim`（版 2）、`cli.nim`（`--target`、`--in-builder`）、新しい `builder/`。実装は K4-2 で、この ADR では行わない。
 - `fukai/delivery`: 目録の版 2 を読む（NIV-29）。K4-2 の時に一緒に直す。
 - kite: `--mount` の VZ の実装と像の取り込み（K4-0）。
-- 未確認で残るもの: podman の層が gzip か、`library/` の署名の名前の足し方、ゲストの終了コードの返し方、offline の gleam、OTP・Nim のビルドの時間と大きさ、ツールチェーンの再現、上流の sigstore の検証。
+- 未確認で残るもの: offline の gleam（K4-3）、ツールチェーンの再現（K4-4）、上流の sigstore の検証。K4-1 までに確かめた物（podman の層が gzip、署名の名前に `/` を含めると通る、ゲストの終了コード、OTP・Nim のビルドの時間と大きさ）は「K4-1 の結果」に書いた。

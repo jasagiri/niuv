@@ -28,6 +28,13 @@
 | NIV-22 | tests/unit/test_cli.nim: `NIV-22 commands` | あり（N1） |
 | NIV-23 | tests/unit/test_gleambuild.nim: `NIV-23 beam placement` | あり（N2） |
 
+## ADR-NIUV-0002 の規則（実装の途中）
+
+| 規則 | E テスト | 状態 |
+|---|---|---|
+| NIV-24〜NIV-31 | （K4-2 以降で実装と同時に足す） | 未実装 |
+| NIV-32 | builder/test/test_verify.sh（入力の SHA-256 が合わなければ止まる）。像の中身の記録（d）は `builder/records/` の実測で、`builder/selftest.sh` をゲストで流した結果が E | 一部あり（K4-1）。`test_all` の外で `sh builder/test/test_verify.sh` を手で流す |
+
 ## 注
 
 - 「あり」は、その suite が `tests/test_all.nim` に入っており、全部緑であること（`tests/acceptance/` は fukai の兄弟リポジトリを読むので test_all の外で、手で流す）。テストが無い規則の行は「未実装」と書く。実装と同じ変更でこの表を更新する。

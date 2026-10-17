@@ -1,0 +1,66 @@
+# The builder image (ADR-NIUV-0002, NIV-32 b): musl Nim, OTP, gleam and niuv on
+# Alpine, aarch64 only. Built by build.sh, which stages the context.
+# Every upstream tarball is checked against inputs.sha256 here as well as
+# on the host: the check is the first thing a build does, before any long step.
+ARG ALPINE_REF
+
+FROM ${ALPINE_REF} AS inputs
+WORKDIR /in
+COPY inputs.sha256 nim-2.2.12.tar.xz otp_src_29.1.1.tar.gz gleam-v1.19.1-aarch64-unknown-linux-musl.tar.gz ./
+RUN sha256sum -c inputs.sha256
+
+# Nim 2.2.12 from the csources distribution: build.sh makes a first compiler
+# from C, koch boot makes the real one.
+FROM ${ALPINE_REF} AS nim
+RUN apk add --no-cache gcc musl-dev linux-headers make xz
+COPY --from=inputs /in/nim-2.2.12.tar.xz /src/
+WORKDIR /src
+RUN tar xf nim-2.2.12.tar.xz && cd nim-2.2.12 \
+ && sh build.sh \
+ && bin/nim c --skipUserCfg --skipParentCfg -d:release koch \
+ && ./koch boot -d:release \
+ && mkdir -p /opt/nim && cp -R bin config lib copying.txt /opt/nim/ \
+ && rm -f /opt/nim/bin/nim_dbg
+
+# OTP 29.1.1 from source. Left out: what needs a window system, Java or ODBC.
+FROM ${ALPINE_REF} AS otp
+RUN apk add --no-cache build-base perl ncurses-dev openssl-dev zlib-dev linux-headers autoconf
+COPY --from=inputs /in/otp_src_29.1.1.tar.gz /src/
+WORKDIR /src
+RUN tar xzf otp_src_29.1.1.tar.gz && cd otp_src_29.1.1 \
+ && ./configure --prefix=/opt/otp --without-javac --without-wx --without-odbc \
+      --without-debugger --without-observer --without-et \
+ && make -j"$(nproc)" \
+ && make install
+
+# niuv, bootstrapped with nim c (niuv cannot build itself before it exists).
+# The workspace is laid out the way niuv/nim.cfg expects it.
+FROM ${ALPINE_REF} AS niuv
+RUN apk add --no-cache gcc musl-dev linux-headers
+COPY --from=nim /opt/nim /opt/nim
+COPY ws /ws
+COPY ext /ext
+WORKDIR /ws/niuv
+RUN /opt/nim/bin/nim c -d:release --hints:off --mm:orc \
+      --path:/ext/parsetoml-0.7.2 --path:/ext/results-0.5.1 --path:/ext/checksums-0.2.1 \
+      -o:/niuv src/niuv.nim
+
+FROM ${ALPINE_REF}
+RUN apk add --no-cache gcc musl-dev linux-headers make libcrypto3 ncurses-libs zlib libstdc++
+COPY --from=nim /opt/nim /opt/nim
+COPY --from=otp /opt/otp /opt/otp
+COPY --from=inputs /in/gleam-v1.19.1-aarch64-unknown-linux-musl.tar.gz /tmp/
+RUN tar xzf /tmp/gleam-v1.19.1-aarch64-unknown-linux-musl.tar.gz -C /usr/local/bin gleam \
+ && rm /tmp/gleam-v1.19.1-aarch64-unknown-linux-musl.tar.gz
+COPY --from=niuv /niuv /usr/local/bin/niuv
+RUN ln -s /opt/nim/bin/nim /usr/local/bin/nim \
+ && for b in erl erlc escript epmd; do ln -s /opt/otp/bin/$b /usr/local/bin/$b; done
+COPY selftest.sh /usr/local/bin/builder-selftest
+COPY LICENSES.md /usr/share/niuv-builder/LICENSES.md
+# What went in, written while building so it cannot drift from the image.
+RUN mkdir -p /usr/share/niuv-builder \
+ && apk info -v | sort > /usr/share/niuv-builder/apk-info.txt \
+ && { echo "nim: $(/opt/nim/bin/nim -v | head -1)"; \
+      echo "otp_version: $(cat /opt/otp/lib/erlang/releases/*/OTP_VERSION)"; \
+      echo "erts: $(ls /opt/otp/lib/erlang | grep '^erts-')"; \
+      echo "gleam: $(gleam --version)"; } > /usr/share/niuv-builder/tools.txt

@@ -1,0 +1,8 @@
+# Third-party Nim sources of niuv (niuv.toml [dependencies.external]), pinned by
+# the tree hash of the files build.sh copies (builder/tree-hash.sh DIR PATH).
+# Taken from the nimble cache of the machine that builds the image; the
+# upstream git revision of each is the one nimble recorded.
+# <tree sha256>  <name>  <copied path>  <git revision>
+3aeaf5cc13a55b2df2a724f62932e40cbd5ea21c120043312490b0865cc7f104  parsetoml-0.7.2  githubcom_NimParsersparsetomlgit_072  src  d297f5a81be2472905d367aa675dcbbca6e7a5d2
+2e2ffe8fbfd9334eebcb30c28b57d86638a2579979462a225e1082d8060be573  results-0.5.1  githubcom_arnetheducknimresults_051  results.nim  df8113dda4c2d74d460a8fa98252b0b771bf1f27
+6742dd4faa040a453e6e93ffce56b1f404686e8f098f958c799e1d60d6eda4ae  checksums-0.2.1  githubcom_nimlangchecksums_021  src  f8f6bd34bfa3fe12c64b919059ad856a96efcba0
