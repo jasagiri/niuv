@@ -67,7 +67,7 @@ without the execute bit (`chroot: can't execute … Permission denied`, exit
 
 | | |
 |---|---|
-| Manifest digest (what `[builder]` pins from now on) | `sha256:0f5f221a3ade5f25e9ccf6f5d72adc8980efd90279ea0683adfb77fb604c0287` |
+| Manifest digest (what `[builder]` pinned in K4-2; superseded by the K4-3 image below) | `sha256:0f5f221a3ade5f25e9ccf6f5d72adc8980efd90279ea0683adfb77fb604c0287` |
 | Config digest (podman image id) | `sha256:076219468308d986b40440cdb4df075b0e666f952996ce8512debcd5d0eb1272` |
 | Name given to kite and to `kite_sign` | `niuv/builder-k4` (same key, same warning on every run) |
 | Built with | podman 6.1.1, cache on (the first K4-2 build: `podman build` 539 s, `build.sh` 546 s; the second: 12 s) |

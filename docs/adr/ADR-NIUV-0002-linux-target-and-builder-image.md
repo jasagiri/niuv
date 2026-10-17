@@ -156,6 +156,14 @@ jasagiri が案 B を選んだ（fukai roadmap 0.1 章 121）。niuv が閉包�
 
 - **gleam 1.19.1 の `compile-package` で足りたこと。** `--target erlang --package DIR --out DIR --lib DIR --no-dev [--otp-app-names a=b,…]`。`--lib` に置いたコンパイル済みのパッケージだけが見える（宣言していない依存の import は `Unknown module`）。Erlang の FFI（`.erl`）は `ebin` に `.beam` として入り、`.app` も作られる。Hex のパッケージは、Hex のアーカイブ（`<OUTER_CHECKSUM>.tar` の中の `contents.tar.gz`）を展開した物をそのまま `--package` に渡せる。足りなかったこと: `<app>@@main` の入口モジュール（`gleam export erlang-shipment` が根に足す）を作らない。`--no-dev` でも `test/` の `.erl` は `ebin` に入る（`erlang-shipment` の道でも同じだった）。
 - **(a) 旧い道との一致。** fukai/agent の閉包（ホスト）で、旧い道（`gleam export`）の 54 個と新しい道の 53 個を SHA-256 で照らした: **43 個が一致、10 個が違い、1 個（`fukai_agent@@main`）は新しい道が出さない。** 違う 10 個（`fukai_agent`、`fukai_agent@ask`、`fukai_agent@ledger`、`fukai_column`、`fukai_store`、`gl_hotswap`、`gl_hotswap@internal@raw`、`gl_mfa_supervisor`、`gl_mfa_supervisor@internal@callback`、`gleam@erlang@process`）は、`beam_lib` で欄ごとに比べると **`debug_info` の欄（10 個とも）と `Docs` の欄（6 個）だけ**が違い、コード・属性・輸入・輸出・リテラル・文字列・局所関数の欄は同じだった。違いは型変数の名前（旧い道 `'GHW'`、新しい道 `'UA'`）で、gleam が 1 つのプロセスの中で何を先に読んだかの内部のカウンタで決まる。合わせていない（`debug_info` を落とせば合うが、コードの欄の同一性を測る手がかりも失う）。NIV-17 の約束は niuv の道の中だけにした。新しい道の中では決まる: `--lib` に置く順を 3 通りに変えても同じ、場所の違う 2 か所のビルドで同じ。`--lib` に閉包の全部を置くと違う値になる（手で作った 1 回目の測定はそうだった）ので、各パッケージには依存だけを見せる。
+- **(a) の判断（jasagiri 側の承認、2026-10-17）。** 違いが `debug_info` と `Docs` に限り、コード以下の欄が同じこと、新しい道の中では場所・順によらず同じこと、ホストとゲストで 53 個が一致したことをもって合格とする。`debug_info` は落とさない。比べた欄（旧い道と新しい道で違った 10 個について）:
+
+  | 欄 | 結果 |
+  |---|---|
+  | `Code`、`Attr`、`ImpT`、`ExpT`、`LitT`、`StrT`、`LocT`、atoms、compile_info | 10 個とも同じ |
+  | `Dbgi`（debug_info） | 10 個とも違う（型変数の名前のみ） |
+  | `Docs` | 6 個で違う（同上） |
+
 - **(b) 網を断ったホスト。** `sandbox-exec` で網を断って `niuv build fukai-agent` が通り、網ありの結果と全 `.beam` が一致した（Hex の写しは、ホストの gleam が `~/Library/Caches/gleam` に持つ物）。
 - **(c) niuv の試験。** `tests/test_all.nim` は 308 件・失敗 0・警告 0（Gleam の試験は、Hex の写し・展開の拒み・`tar` の起動名を含め 27 件）。`tests/acceptance/test_fukai_agent.nim`（NIV-17、場所に依らない一致と GPL の拒み）は緑。`tests/acceptance/test_builder_guest.nim`（実物の kite と新しい像）も緑。
 - **ゲストの `niuv build fukai-agent --target aarch64-linux-musl --in-builder`。** 網なしで通り、ホストの照らし直しが通った（53 モジュール、`gleam_stdlib` と `gleam_erlang` は Hex の写しから）。ゲストの 53 個の SHA-256 は、macOS のホストの niuv が作った 53 個と**全部一致**した（K4-4 の入口の測定）。
