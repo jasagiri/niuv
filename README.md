@@ -2,7 +2,7 @@
 
 Nim・Gleam（・WASM）の多言語ビルドの道具。パッケージごとの宣言（`niuv.toml`）と作業場（`niuv.workspace.toml`）から、依存の閉包を解決し、ロック（`niuv.lock`）に固定し、`nim` と `gleam` を呼んでビルドし、成果物の目録（決定的 CBOR）と SBOM を出す。`sealed` 印の成果物に GPL-3.0・LGPL-3.0・AGPL-3.0 が入るときは断る。
 
-規則は [ADR-NIUV-0001](docs/adr/ADR-NIUV-0001.md)（NIV-01〜23、Status: proposed）、規則とテストの対応は [docs/quality/spec-coverage.md](docs/quality/spec-coverage.md)。設計の出どころは `fukai/docs/build-and-delivery.md`。
+規則は [ADR-NIUV-0001](docs/adr/ADR-NIUV-0001.md)（NIV-01〜23、Status: proposed）、規則とテストの対応は [docs/quality/spec-coverage.md](docs/quality/spec-coverage.md)。設計の出どころは `fukai/docs/build-and-delivery.md`。Linux の目標とビルド用の像の案は [ADR-NIUV-0002](docs/adr/ADR-NIUV-0002-linux-target-and-builder-image.md)（NIV-24〜32、Status: proposed。未実装）。
 
 ## 位置付け
 
