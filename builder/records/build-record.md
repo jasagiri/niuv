@@ -82,3 +82,18 @@ rebuilt from the mounted sources in the guest: the third-party Nim sources it
 needs (parsetoml, results, checksums) are not in the final image, only in the
 build stage. The pin that makes the guest's niuv trusted is the image digest
 (NIV-28).
+
+## The image of K4-3 (2026-10-17): niuv compiles Gleam with `compile-package`
+
+The same recipe, with niuv at jj `6919be9b66be` (`feat(gleam): compile each package with gleam compile-package` and `fix(gleam): start tar under its own name`). The guest's niuv no longer calls `gleam export erlang-shipment`, so a package with a `path` dependency builds in the guest without the network (ADR-NIUV-0002, "K4-3 の結果").
+
+| | |
+|---|---|
+| Manifest digest (what `[builder]` pins from now on) | `sha256:40ede3aa423d3c065451d96cf9c1e32467b5549073ff7c3c6106a30d2aaf5107` |
+| Config digest (podman image id) | `sha256:0ccce4fbd5c203b41bba31d349cf701efa8325aaeeffa9378f6b6855ccf765d0` |
+| Name given to kite and to `kite_sign`; podman tag | `niuv/builder-k4`; `localhost/niuv-builder-k4:k43` |
+| Built with | podman 6.1.1, cache on (`podman build` 23 s: only the niuv stage and what follows were rebuilt) |
+| Trees built in (recorded, not pinned) | niuv `173e75ab…` (jj `6919be9b66be`, working copy clean), nim-cbor-det `f0fc1d28…`, nim-frames `ff7490d0…`, nim-fdio `2284b43d…` (same as K4-2) |
+| Signed by | the development key `niuv-builder-dev-k4`, as before |
+
+`exe-sha256.txt` is of this image (only the `niuv` line differs from K4-2's); `apk-info.txt` and `tools.txt` are unchanged. The K4-2 image (`sha256:0f5f221a…`) builds Gleam packages that have a `path` dependency only with the network, so `--in-builder` should use this one. An earlier build of the same commit minus the `tar` fix had digest `sha256:c2f816cb…`; it cannot unpack a Hex archive in the guest (busybox) and is not to be used.
