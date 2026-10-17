@@ -55,3 +55,30 @@ The tarballs' sigstore bundles (no `cosign` here; Future), `niuv`'s own test
 suite in the guest (K4-3), offline `gleam` (K4-3), that `erlc` writes the same
 bytes as the host's OTP 29.1.1 (K4-4), that the image can be rebuilt to the
 same digest (not promised).
+
+## The image of K4-2 (2026-10-17): K4-1's image plus the entry `builder-run`
+
+K4-2 needs the image to start a program that reads its job from a mount
+(kite starts only a program that is in the image). The recipe gained
+`builder-run` (`COPY --chmod=755`), the image was built again, imported and
+signed with the same development key. The first build of it had `builder-run`
+without the execute bit (`chroot: can't execute … Permission denied`, exit
+126); the digests below are of the second build.
+
+| | |
+|---|---|
+| Manifest digest (what `[builder]` pins from now on) | `sha256:0f5f221a3ade5f25e9ccf6f5d72adc8980efd90279ea0683adfb77fb604c0287` |
+| Config digest (podman image id) | `sha256:076219468308d986b40440cdb4df075b0e666f952996ce8512debcd5d0eb1272` |
+| Name given to kite and to `kite_sign` | `niuv/builder-k4` (same key, same warning on every run) |
+| Built with | podman 6.1.1, cache on (the first K4-2 build: `podman build` 539 s, `build.sh` 546 s; the second: 12 s) |
+| Trees built in (recorded, not pinned) | niuv `9b401c3e…` (jj `9739b1762e7c`, working copy 6 files changed: the kite version probe, tests and this recipe), nim-cbor-det `f0fc1d28…` (`24e7fd823db6`), nim-frames `ff7490d0…` (`2cfd9b6ea875`), nim-fdio `2284b43d…` (`90fe2f818464`) |
+| Disk of the machine | 15 GiB free before the first build, 11 GiB after it (podman's VM disk and the OCI layout), 9 GiB after the acceptance runs |
+
+`exe-sha256.txt` is of this image (only the `niuv` line differs from K4-1's).
+`selftest.txt`, `apk-info.txt` and `tools.txt` are K4-1's: the layers below the
+last two are the same, and `selftest.sh` was not run again on this image. The
+guest `niuv` is the one in the image (built from the trees above). It is not
+rebuilt from the mounted sources in the guest: the third-party Nim sources it
+needs (parsetoml, results, checksums) are not in the final image, only in the
+build stage. The pin that makes the guest's niuv trusted is the image digest
+(NIV-28).

@@ -56,7 +56,7 @@ COPY --from=niuv /niuv /usr/local/bin/niuv
 RUN ln -s /opt/nim/bin/nim /usr/local/bin/nim \
  && for b in erl erlc escript epmd; do ln -s /opt/otp/bin/$b /usr/local/bin/$b; done
 COPY selftest.sh /usr/local/bin/builder-selftest
-COPY builder-run /usr/local/bin/builder-run
+COPY --chmod=755 builder-run /usr/local/bin/builder-run
 COPY LICENSES.md /usr/share/niuv-builder/LICENSES.md
 # What went in, written while building so it cannot drift from the image.
 RUN mkdir -p /usr/share/niuv-builder \

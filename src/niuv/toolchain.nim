@@ -6,9 +6,7 @@
 ## whether mise or PATH found it. Inside the builder guest (NIV-28) the tools
 ## are on PATH and mise does not exist: `pathOnly` ignores `via` there.
 ##
-## `kite` (NIV-27) is the one tool whose version cannot be read from the
-## executable: it prints no version (checked 2026-10-17, kite f293ee9b). Its
-## `version` is the declared label and the SHA-256 is what is verified.
+## `kite` (NIV-27) prints `kite <version>` for `--version` (kite 0.2.0 and later).
 
 import std/[options, os, strutils]
 import ./[errors, exec, hashing, workspace]
@@ -77,8 +75,11 @@ proc versionOf(spec: ToolSpec, exe: string): NResult[string] {.raises: [].} =
     if r.code != 0: return toolErr[string]("tool erlang: " & erl & " failed: " & r.output.strip())
     ok(r.output.strip())
   of "kite":
-    # Nothing to read: see the module comment.
-    ok(spec.version)
+    let r = ?runProcess(exe, @["--version"])
+    let parts = r.output.strip().split(' ')
+    if r.code == 0 and parts.len == 2 and parts[0] == "kite": return ok(parts[1])
+    toolErr[string]("tool kite: cannot read a version from '" & r.output.strip() & "' (exit " & $r.code &
+                    "); kite 0.2.0 or later prints 'kite <version>' for --version")
   else:
     toolErr[string]("tool " & spec.name & " is not one niuv drives")
 

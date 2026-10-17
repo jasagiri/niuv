@@ -17,6 +17,7 @@ const
   digest = "sha256:" & "cd".repeat(32)
   image = "niuv/builder@" & digest
   fakeKite = """#!/bin/sh
+if [ "$1" = "--version" ]; then echo "kite ${FAKE_KITE_VERSION-0.1.0}"; exit 0; fi
 printf '%s\n' "$@" > "$FAKE_KITE_LOG"
 out=""
 for a in "$@"; do
@@ -72,7 +73,7 @@ proc withKite(r: Rig, body: proc ()) =
     body()
   finally:
     putEnv("PATH", oldPath)
-    for k in ["FAKE_KITE_LOG", "FAKE_KITE_OUT", "FAKE_KITE_EXIT", "FAKE_KITE_SAY"]: delEnv(k)
+    for k in ["FAKE_KITE_LOG", "FAKE_KITE_OUT", "FAKE_KITE_EXIT", "FAKE_KITE_SAY", "FAKE_KITE_VERSION"]: delEnv(k)
 
 proc lockHost(r: Rig) =
   withKite(r, proc () = check runCli(@["lock", "--workspace", r.ws]).code == 0)
@@ -270,6 +271,15 @@ suite "NIV-27 niuv build --in-builder":
       let res = r.build()
       check res.code != 0
       check "kite" in res.stderr and "0.1.0" in res.stderr
+      check not fileExists(r.log))
+
+  test "Given a kite that prints no version, When built in the builder, Then it is refused before the guest starts":
+    let r = ready("ib-kitenover")
+    withKite(r, proc () =
+      putEnv("FAKE_KITE_VERSION", "")
+      let res = r.build()
+      check res.code != 0
+      check "kite" in res.stderr
       check not fileExists(r.log))
 
   test "Given a workspace that pins no kite, When built in the builder, Then it is refused":

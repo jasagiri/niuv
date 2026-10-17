@@ -54,7 +54,7 @@ proc makeWorkspace(dir: string) =
   writeFile(dir / "broken" / "src" / "placeholder.nim", "discard\n")
   writeFile(dir / "broken" / "child" / "b.nim", "this is not nim (\n")
   writeFile(dir / "niuv.workspace.toml", "[workspace]\nmembers = [\"demo\", \"broken\"]\n[tools.nim]\nversion = \"" & nimV &
-    "\"\n[tools.gleam]\nversion = \"" & gleamV & "\"\n[tools.erlang]\nversion = \"" & otpV & "\"\n[tools.kite]\nversion = \"0.1.0\"\n")
+    "\"\n[tools.gleam]\nversion = \"" & gleamV & "\"\n[tools.erlang]\nversion = \"" & otpV & "\"\n[tools.kite]\nversion = \"0.2.0\"\n")
 
 proc guestFlags(): seq[string] =
   @["--signature", need("NIUV_ACC_SIGNATURE"), "--kernel", need("NIUV_ACC_KERNEL"), "--initrd", need("NIUV_ACC_INITRD"),

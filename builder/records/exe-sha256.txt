@@ -1,5 +1,5 @@
 3d32c34426bbc570e2f2a7cd2249fd067a238d92dff676aac05cc61d866d26b2  opt/nim/bin/nim
 a8f0a197cd54c3651fb8112a9410b326c1f910aadf149cf7512e9c7c6a451fd5  usr/local/bin/gleam
-b321586416060ffae8d9cae8cefe9066ef877460c746cf99579296727f07485e  usr/local/bin/niuv
+f15f280819cbdb9276634bb4a5a6e8843a4cb42da903bf2a629077e200b4005a  usr/local/bin/niuv
 ca46a6203c4a44e911300d62fe298bdaf0414f0fc84b4fa3ceb02552139678e3  opt/otp/lib/erlang/erts-17.1/bin/beam.smp
 da40cec500456cddd914fad192e4cfaf7d74ab69459b84939fc54cb9f2c6cfe3  opt/otp/lib/erlang/erts-17.1/bin/erlexec

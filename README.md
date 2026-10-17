@@ -60,7 +60,7 @@ niuv build <package> --target aarch64-linux-musl --in-builder --out DIR [--signa
 
 `build` はロックが無い・古い、ツールの版か実行ファイルがロックと違う、閉包に同じ外の依存が 2 つの版で来る、のどれかで断る。出力先には成果物と `niuv.manifest.cbor`、`niuv.sbom.cdx.json` だけが置かれ、コンパイラの作業場（nimcache）と Gleam の写しは置き場の根（`--stage`、既定は一時ディレクトリの `niuv-stage`）の下に置かれる。
 
-`--target T` を付けると、ロックは `niuv.<T>.lock` になる（付けなければ `niuv.lock`）。niuv は自分が走っている機械の目標（`aarch64-macos-none` か `aarch64-linux-musl`）だけを作り、別の目標は `--in-builder`（kite のゲストの中で niuv を走らせる）で作る。`--in-builder` は `niuv.<T>.lock` の `[builder] image = "NAME@sha256:…"` の像だけを起こし、終わったあとにホストが目録を読み直して、全成果物の SHA-256 と大きさを自分で取り直す（ゲストの出力は信じない。目録に無いファイルがあれば断る）。ホストの `niuv.lock` には `[tools.kite]` の実行ファイルの SHA-256 が要る。kite は版を表示しないので、`[tools.kite] version` は宣言の札で、照合されるのは実行ファイルの SHA-256 だけ。
+`--target T` を付けると、ロックは `niuv.<T>.lock` になる（付けなければ `niuv.lock`）。niuv は自分が走っている機械の目標（`aarch64-macos-none` か `aarch64-linux-musl`）だけを作り、別の目標は `--in-builder`（kite のゲストの中で niuv を走らせる）で作る。`--in-builder` は `niuv.<T>.lock` の `[builder] image = "NAME@sha256:…"` の像だけを起こし、終わったあとにホストが目録を読み直して、全成果物の SHA-256 と大きさを自分で取り直す（ゲストの出力は信じない。目録に無いファイルがあれば断る）。ホストの `niuv.lock` には `[tools.kite]` の版（`kite --version`、kite 0.2.0 以降）と実行ファイルの SHA-256 が要る。実物の kite と像での受け入れは `tests/acceptance/test_builder_guest.nim`（手で流す）で、Nim の bin と Gleam のアプリのビルドが通った（ADR-NIUV-0002 の「K4-2 の結果」）。
 
 宣言と作業場の書き方は ADR の NIV-01〜NIV-07、例は `tests/unit/` の各ファイルの先頭にある。宣言を持たない既存のパッケージは、作業場の側の宣言から `[package] root` で指す（NIV-06）。
 

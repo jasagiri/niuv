@@ -33,7 +33,7 @@ K1 で、Linux のゲストの中なら musl の Nim 2.2.12 で fukai の子が�
 
 ホストからの呼び出し
 
-- **NIV-27** `niuv build <パッケージ> --target T --in-builder [--signature FILE]` は、ホストで次を行う。(1) ロックの `[builder]` を読む。(2) 作業場（読み取り専用）、外の依存の探し場所（読み取り専用）、出力先（書ける）、gleam の Hex の写し（NIV-29）を、ゲストへ渡す。(3) `kite run --image:<digest> --signature:<FILE> --mount:… ` を、網なし（`--net` なし）で起こす。(4) 終わった後、出力先の `niuv.manifest.cbor` を読み、**ホストが**各成果物の SHA-256 と大きさを目録と照らし、合わなければ断る（ゲストの出力を信じない）。kite はライブラリとして取り込まず、実行ファイルとして呼ぶ（`[tools.kite]` として版と実行ファイルの SHA-256 を、ホストの `niuv.lock` に固定する。`KnownTools` に `kite` を足す）。niuv は腐海を知らないままで、kite は foundation の道具。
+- **NIV-27** `niuv build <パッケージ> --target T --in-builder [--signature FILE]` は、ホストで次を行う。(1) ロックの `[builder]` を読む。(2) 作業場（読み取り専用）、外の依存の探し場所（読み取り専用）、出力先（書ける）、gleam の Hex の写し（NIV-29）を、ゲストへ渡す。(3) `kite run --image:<digest> --signature:<FILE> --mount:… ` を、網なし（`--net` なし）で起こす。(4) 終わった後、出力先の `niuv.manifest.cbor` を読み、**ホストが**各成果物の SHA-256 と大きさを目録と照らし、合わなければ断る（ゲストの出力を信じない）。kite はライブラリとして取り込まず、実行ファイルとして呼ぶ（`[tools.kite]` として版と実行ファイルの SHA-256 を、ホストの `niuv.lock` に固定する。版は `kite --version` で照らす。`KnownTools` に `kite` を足す）。niuv は腐海を知らないままで、kite は foundation の道具。
 - **NIV-28** ゲストの中では、像に入れた niuv が `niuv build --target T`（`--in-builder` なし）を行う。ツールの固定は NIV-13 のとおり、`niuv.<T>.lock` の実行ファイルの SHA-256 と照らす。像の digest を niuv が自分の中から確かめることはできない（像は自分の digest を持てない）ので、像の digest の強制は NIV-27 の呼び出しと kite の署名の確かめが受け持つ。
 
 目録と決まったバイト列
@@ -124,6 +124,18 @@ K4-3 は、完走でなく、試験の件数で確かめる（早合点を避け
 - **入った物**: apk の版は `builder/records/apk-info.txt`（38 件。gcc 15.2.0-r5、musl 1.2.6-r2、libcrypto3 3.5.8-r0、alpine-release 3.24.2-r0 など）。実行ファイルの SHA-256 は `builder/records/exe-sha256.txt`。
 
 この段で確かめていないこと: ゲストの中での niuv の試験の実行（K4-3）、offline の gleam、像を同じ digest で作り直せるか（約束しない）、sigstore の検証（Future）、`erlc` が出す beam がホストの OTP 29.1.1 のものと一致するか（K4-4）。
+
+## K4-2 の結果（2026-10-17）
+
+NIV-24〜29、31 を実装し、E テストを足した（`docs/quality/spec-coverage.md`）。実物の kite と像での受け入れ（`tests/acceptance/test_builder_guest.nim`）が通った。
+
+- **像に入口が要った。** kite は `--cmdline:init=PATH` の PATH が像の根に在ることを要求する（mount したスクリプトは起動できない。実測: `the image root has no /ctl/run.sh to start`）。そこで像に `builder-run`（`exec /bin/sh /ctl/run.sh`）を足して作り直した。新しい digest が `[builder]` の pin（`builder/records/build-record.md`）。K4-1 の像（`f5d5b3c2…`）は入口を持たないので、`--in-builder` には使えない。
+- **ゲストの niuv は像の中の niuv。** 当初は「mount したソースからゲストで `nim c` する」案だったが、niuv の第三者の Nim ソース（parsetoml・results・checksums）は像の最終段に無い（ビルド段だけ）ので、ゲストでは組めない。像の niuv は像を作るときに記録した木（nim-cbor-det・nim-frames・nim-fdio を含む）から組まれ、それを信じる根は NIV-28 のとおり像の digest。
+- **ホストの呼び出し。** ソースは同じ絶対パスで ro に mount（読み込み先が isomorphic なので、ゲストは同じ `niuv.workspace.toml`・同じロック・同じ相対パスを読む）。出力先は `/out`（rw）、命令は `/ctl/run.sh`（ro）、gleam の Hex の写しは `/hex`（ro。ゲストがキャッシュへ写す）。kite の mount は 8 個までなので、ソースの置き場所が多いときは共通の親へまとめる（`/` までは上がらない）。`--net` は渡さない。
+- **kite の固定。** ホストの `niuv.lock` に `[tools.kite]` の版と実行ファイルの SHA-256 を持つ。版は `kite --version`（kite 0.2.0 以降。出力 `kite <版>`）を走らせて照らす。
+- **ホストの再照合（NIV-27 の 4）の範囲。** 目録の形式の版が 2、パッケージ・版・目標が頼んだとおり、Nim の bin の集合が宣言と一致、beam を含むなら OTP の版が `niuv.<T>.lock` の erlang の版と一致、ファイル名が安全（`/` や `..` を含まない）、全ファイルが通常のファイル（シンボリックリンクでない）で SHA-256 と大きさが目録と一致、目録・SBOM・目録に載ったファイル以外が出力先に無い。出力先は、始める前に空でなければ断る。`lock --in-builder` では、ホストが全パッケージ・外の依存のハッシュを自分で取り直し、ゲストのロックと合わなければ断る（ツールの SHA-256 だけがゲストの申告）。
+- **実測。** 受け入れ（Nim の bin 1 つと、`gleam_stdlib` に依存する Gleam のアプリ 1 つ）でゲストの `niuv lock --target aarch64-linux-musl` と `niuv build` が通り、Nim の出力は ELF（aarch64）、目録は版 2・目標 `aarch64-linux-musl`・OTP `29.1.1`。Nim が通らないパッケージは、ゲストが終了コード 1 で終わり、ホストが断った。ゲストの offline の gleam（Hex の写しと `manifest.toml` だけ）は通った。
+- **確かめていないこと。** `fukai/agent` など実物のパッケージ（K4-3）、全 `.beam` の一致（K4-4）、像の署名は開発用の鍵のまま。kite は走るたびに `~/.kite/runs/<id>/rootfs`（約 400 MB）を残す（kite 側の課題）。
 
 ## 決めてほしい点
 
