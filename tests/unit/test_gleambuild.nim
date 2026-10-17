@@ -160,6 +160,21 @@ suite "NIV-16 gleam plumbing":
     check r.get.hex[0].version == "1.0.0"
     check r.get.hex[0].licenses == @["MIT"]
 
+  test "Given a tar that is a link to a multi-call program, When built with a Hex dependency, Then tar is started under the name tar":
+    # Alpine's tar is a link to busybox, which picks its applet from the name it is started under.
+    let d = freshDir("gl-hex-multicall")
+    let sum = makeHexPackage(d, "hexlib", "1.0.0")
+    let realTar = findExe("tar")
+    createDir(d / "bin")
+    writeFile(d / "bin" / "multicall", "#!/bin/sh\ncase \"$0\" in */tar) exec " & realTar & " \"$@\" ;; *) echo \"$0: applet not found\" >&2; exit 1 ;; esac\n")
+    setFilePermissions(d / "bin" / "multicall", {fpUserRead, fpUserWrite, fpUserExec})
+    createSymlink(d / "bin" / "multicall", d / "bin" / "tar")
+    let oldPath = getEnv("PATH")
+    putEnv("PATH", d / "bin" & ":" & oldPath)
+    let r = build(d, makeWorkspace(d, hexSum = sum), d / "stage")
+    putEnv("PATH", oldPath)
+    check r.isOk
+
   test "Given a Hex archive that is not the one the lock names, When built, Then it is refused naming both checksums":
     let d = freshDir("gl-hex-sum")
     let sum = makeHexPackage(d, "hexlib", "1.0.0")

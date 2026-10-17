@@ -183,7 +183,8 @@ proc unpackHex(h: HexPackage, cache, to: string): NResult[void] {.raises: [].} =
     return buildErr[void](tarball & " has SHA-256 " & got & " but the lock says " & h.checksum)
   var tar = ""
   try:
-    tar = findExe("tar")
+    # Not followed: busybox's tar is a link to busybox, which picks the applet from the name it is started under.
+    tar = findExe("tar", followSymlinks = false)
   except CatchableError as e:
     return err(niuvError(ekIo, "searching PATH for tar: " & e.msg))
   if tar.len == 0: return buildErr[void]("no tar on PATH to unpack " & tarball)
