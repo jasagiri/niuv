@@ -28,11 +28,20 @@
 | NIV-22 | tests/unit/test_cli.nim: `NIV-22 commands` | あり（N1） |
 | NIV-23 | tests/unit/test_gleambuild.nim: `NIV-23 beam placement` | あり（N2） |
 
-## ADR-NIUV-0002 の規則（実装の途中）
+## ADR-NIUV-0002 の規則（K4-2）
 
-| 規則 | E テスト | 状態 |
+実装は `src/niuv/target.nim`（NIV-24）、`lock.nim`（NIV-25、26）、`inbuilder.nim`（NIV-27、28、31）、`manifest.nim`（NIV-29）、`cli.nim`。kite を偽物に置き換えた E テストは `test_all` の中。実物の kite でゲストを起こす受け入れは `tests/acceptance/test_builder_guest.nim`（test_all の外）。
+
+| 規則 | E テスト（ファイル: suite 名） | 状態 |
 |---|---|---|
-| NIV-24〜NIV-31 | （K4-2 以降で実装と同時に足す） | 未実装 |
+| NIV-24 | tests/unit/test_target.nim: `NIV-24 targets`、tests/unit/test_cli.nim: `NIV-24 NIV-25 NIV-29 targets, locks and manifests through the command line` | あり（K4-2） |
+| NIV-25 | tests/unit/test_lock.nim: `NIV-25 one lock per target`、tests/unit/test_cli.nim の同上 suite | あり（K4-2） |
+| NIV-26 | tests/unit/test_lock.nim: `NIV-26 builder image`、tests/unit/test_cli.nim: `NIV-26 the builder image through the command line`、tests/unit/test_inbuilder.nim（`[builder]` が無ければ断る） | あり（K4-2） |
+| NIV-27 | tests/unit/test_inbuilder.nim: `NIV-27 coverRoots`、`NIV-27 what the guest gets`、`NIV-27 niuv build --in-builder`、`NIV-27 beams in the guest's output`、`NIV-27 niuv lock --in-builder`（kite は偽物）。実物の kite: tests/acceptance/test_builder_guest.nim | あり（K4-2）。実物の kite は手で流す |
+| NIV-28 | tests/unit/test_cli.nim: `NIV-27 NIV-28 option rules`（`--in-guest`: PATH で探す・`--external-root`・`--lock-out`）、tests/unit/test_inbuilder.nim: `NIV-27 what the guest gets`（ゲストの命令） | あり（K4-2）。ゲストの中で実際に `niuv build` が走ることは受け入れ |
+| NIV-29 | tests/unit/test_manifest.nim: `NIV-29 manifest format version 2`、tests/unit/test_cli.nim の NIV-24 suite（ネイティブのビルドの目録）、fukai/delivery の `tests/test_publish.nim`（版 1 と版 2 を読む） | あり（K4-2） |
+| NIV-30 | （K4-4 で測る。この段では実装しない） | 未実装 |
+| NIV-31 | tests/unit/test_inbuilder.nim: `NIV-27 what the guest gets`（`--net` を渡さない・Hex の写しは ro で /hex・ゲストの命令）、`NIV-27 niuv build --in-builder`（Hex の写しが無ければ断る）。ゲストの offline の gleam は受け入れ | 一部あり（K4-2） |
 | NIV-32 | builder/test/test_verify.sh（入力の SHA-256 が合わなければ止まる）。像の中身の記録（d）は `builder/records/` の実測で、`builder/selftest.sh` をゲストで流した結果が E | 一部あり（K4-1）。`test_all` の外で `sh builder/test/test_verify.sh` を手で流す |
 
 ## 注

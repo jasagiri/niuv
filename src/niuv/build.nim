@@ -7,7 +7,7 @@
 ## because only then are their licenses known.
 
 import std/[options, os, sequtils]
-import ./[artifact, decl, errors, gleambuild, lock, manifest, nimbuild, resolve, sbom, toolchain, workspace]
+import ./[artifact, decl, errors, gleambuild, lock, manifest, nimbuild, resolve, sbom, target, toolchain, workspace]
 
 const
   ManifestFile* = "niuv.manifest.cbor"
@@ -19,10 +19,22 @@ type
     notes*: seq[string]    ## things declared but not built, said out loud
     manifestPath*, sbomPath*: string
 
-proc lockWorkspace*(ws: Workspace): NResult[Lock] {.raises: [].} =
-  ## Probes every tool the workspace pins, then locks.
-  let tools = ?probeTools(ws, ws.tools.mapIt(it.name))
-  buildLock(ws, tools)
+proc lockedToolNames*(ws: Workspace, t: Target): seq[string] {.raises: [].} =
+  ## The pinned tools that run for target `t`: kite starts the guest from the
+  ## host and never runs inside it (NIV-27), so a Linux target does not pin it.
+  ws.tools.mapIt(it.name).filterIt(not (t.isLinux and it in HostOnlyTools))
+
+proc lockWorkspace*(ws: Workspace, namedTarget = "", builder = none(LockedBuilder),
+                    pathOnly = false): NResult[Lock] {.raises: [].} =
+  ## Probes every tool the workspace pins that runs for this target, then
+  ## locks (NIV-25). A lock for a named target keeps the builder image of the
+  ## lock already there when none is given (NIV-26).
+  let tgt = ?ownTarget(namedTarget)
+  let tools = ?probeTools(ws, lockedToolNames(ws, tgt), pathOnly)
+  var image = builder
+  if image.isNone and namedTarget.len > 0 and fileExists(lockPath(ws, namedTarget)):
+    image = (?readLock(ws, namedTarget)).builder
+  buildLock(ws, tools, image)
 
 proc defaultStageRoot*(): string {.raises: [].} =
   try:
@@ -39,10 +51,14 @@ proc writeOut(path, content: string): NResult[void] {.raises: [].} =
   ok()
 
 proc buildPackage*(ws: Workspace, package: string, outDir: string, stageRoot: string,
-                   only: seq[string] = @[]): NResult[BuildOutcome] {.raises: [].} =
+                   only: seq[string] = @[], namedTarget = "", pathOnly = false): NResult[BuildOutcome] {.raises: [].} =
+  ## `namedTarget` is the `--target` of the command line ("" when none): it
+  ## picks the lock (NIV-25) and must be this machine's target (NIV-24).
+  ## `pathOnly` is the guest's way to find tools (NIV-28).
+  let tgt = ?ownTarget(namedTarget)
   let closure = ?resolveClosure(ws, package)
-  let locked = ?readLock(ws)
-  ?checkLock(locked, ws, closure)
+  let locked = ?readLock(ws, namedTarget)
+  ?checkLock(locked, ws, closure, namedTarget)
   let root = ws.find(package).get
   var outcome = BuildOutcome()
 
@@ -58,8 +74,8 @@ proc buildPackage*(ws: Workspace, package: string, outDir: string, stageRoot: st
   var needed: seq[string]
   if buildsNim: needed.add "nim"
   if buildsGleam: needed.add ["gleam", "erlang"]
-  let tools = ?probeTools(ws, needed)
-  ?checkTools(locked, tools)
+  let tools = ?probeTools(ws, needed, pathOnly)
+  ?checkTools(locked, tools, namedTarget)
   proc tool(name: string): ToolInfo {.raises: [].} = tools.filterIt(it.name == name)[0]
 
   var comps = nimComponents(closure)
@@ -76,6 +92,7 @@ proc buildPackage*(ws: Workspace, package: string, outDir: string, stageRoot: st
 
   outcome.manifestPath = outDir / ManifestFile
   outcome.sbomPath = outDir / SbomFile
-  ?writeOut(outcome.manifestPath, ?encodeManifest(root.name, root.version, outcome.artifacts))
+  let otp = if outcome.artifacts.anyIt(it.kind == akBeam): tool("erlang").version else: ""
+  ?writeOut(outcome.manifestPath, ?encodeManifest(root.name, root.version, outcome.artifacts, $tgt, otp))
   ?writeOut(outcome.sbomPath, renderSbom(root.name, root.version, comps))
   ok(outcome)

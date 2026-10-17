@@ -1,6 +1,7 @@
-## E tests for the lock: NIV-11 (content), NIV-12 (stale), NIV-13 (tool pin).
+## E tests for the lock: NIV-11 (content), NIV-12 (stale), NIV-13 (tool pin),
+## NIV-25 (one lock per target) and NIV-26 (the builder image).
 
-import std/[os, osproc, sequtils, strutils, unittest]
+import std/[options, os, osproc, sequtils, strutils, unittest]
 import ../../src/niuv/[errors, hashing, lock, resolve, toolchain, workspace]
 import support
 
@@ -274,3 +275,105 @@ suite "NIV-13 tool pin":
     check t.isErr
     check t.error.kind == ekTool
     check "nim" in t.error.msg
+
+const
+  digest = "sha256:" & "ab".repeat(32)
+  image = "niuv/builder@" & digest
+  linux = "aarch64-linux-musl"
+
+suite "NIV-25 one lock per target":
+  test "Given no target, When the lock is placed, Then it is niuv.lock next to the workspace file":
+    let d = freshDir("lock-t-none")
+    let ws = makeWorkspace(d)
+    check lockPath(ws) == d / "niuv.lock"
+    check lockFileName("") == "niuv.lock"
+
+  test "Given a target, When the lock is placed, Then it is niuv.<target>.lock":
+    let d = freshDir("lock-t-named")
+    let ws = makeWorkspace(d)
+    check lockPath(ws, linux) == d / "niuv.aarch64-linux-musl.lock"
+
+  test "Given locks written for two targets, When read, Then each file holds its own tools":
+    let d = freshDir("lock-t-two")
+    let ws = makeWorkspace(d)
+    let a = buildLock(ws, @[nimTool]).get
+    let b = buildLock(ws, @[ToolInfo(name: "nim", version: "2.2.12", exe: "/y/nim", sha256: "bb")]).get
+    check writeLock(ws, a).isOk
+    check writeLock(ws, b, linux).isOk
+    check readLock(ws).get.tools[0].sha256 == "aa"
+    check readLock(ws, linux).get.tools[0].sha256 == "bb"
+
+  test "Given the same workspace locked for two targets, When compared, Then packages and externals are equal":
+    let d = freshDir("lock-t-same")
+    let ws = makeWorkspace(d)
+    let a = buildLock(ws, @[nimTool]).get
+    let b = buildLock(ws, @[ToolInfo(name: "nim", version: "2.2.12", exe: "/y/nim", sha256: "bb")]).get
+    check a.packages == b.packages
+    check a.externals == b.externals
+    check a.tools != b.tools
+
+  test "Given a target without a lock file, When read, Then it is refused naming that file":
+    let d = freshDir("lock-t-missing")
+    let ws = makeWorkspace(d)
+    check writeLock(ws, buildLock(ws, @[nimTool]).get).isOk
+    let r = readLock(ws, linux)
+    check r.isErr
+    check "niuv.aarch64-linux-musl.lock" in r.error.msg
+
+  test "Given a stale target lock, When checked, Then the message names the target's lock and its command":
+    let d = freshDir("lock-t-stale")
+    let ws = makeWorkspace(d)
+    let l = buildLock(ws, @[nimTool]).get
+    writeFile(d / "lib" / "src" / "lib.nim", "echo 1")
+    let r = checkLock(l, ws, resolveClosure(ws, "app").get, linux)
+    check r.isErr
+    check "niuv lock --target " & linux in r.error.msg
+
+  test "Given a tool the target's lock does not pin, When checked, Then the message names that lock":
+    let l = Lock()
+    let r = checkTools(l, @[nimTool], linux)
+    check r.isErr
+    check "niuv.aarch64-linux-musl.lock" in r.error.msg
+
+suite "NIV-26 builder image":
+  test "Given an image by digest with a slash in its name, When checked, Then it is accepted":
+    check checkBuilderImage(image).get.image == image
+
+  test "Given a tag instead of a digest, When checked, Then it is refused":
+    for s in ["niuv/builder:latest", "niuv/builder", "niuv/builder:1@" & digest, "niuv/builder@latest"]:
+      check checkBuilderImage(s).isErr
+
+  test "Given a name without a slash, When checked, Then it is refused":
+    check checkBuilderImage("builder@" & digest).isErr
+    check checkBuilderImage("/builder@" & digest).isErr
+
+  test "Given a digest that is not 64 lowercase hex, When checked, Then it is refused":
+    check checkBuilderImage("niuv/builder@sha256:" & "ab".repeat(31)).isErr
+    check checkBuilderImage("niuv/builder@sha256:" & "AB".repeat(32)).isErr
+    check checkBuilderImage("niuv/builder@sha512:" & "ab".repeat(32)).isErr
+
+  test "Given a lock with a builder, When rendered, parsed and rendered, Then the bytes are equal":
+    let d = freshDir("lock-b-roundtrip")
+    let ws = makeWorkspace(d)
+    let l = buildLock(ws, @[nimTool], some(LockedBuilder(image: image))).get
+    let text = renderLock(l)
+    check "[builder]\nimage = \"" & image & "\"" in text
+    let back = parseLock(text, "x.lock")
+    check back.isOk
+    check back.get.builder.get.image == image
+    check renderLock(back.get) == text
+
+  test "Given a lock without a builder, When rendered, Then there is no [builder] table":
+    let d = freshDir("lock-b-none")
+    let ws = makeWorkspace(d)
+    check "[builder]" notin renderLock(buildLock(ws, @[nimTool]).get)
+
+  test "Given a lock whose builder is a tag, When parsed, Then it is refused":
+    let text = "lock-version = 1\n[builder]\nimage = \"niuv/builder:latest\"\n"
+    let r = parseLock(text, "x.lock")
+    check r.isErr
+    check "builder" in r.error.msg
+
+  test "Given a builder table with another key, When parsed, Then it is refused":
+    let text = "lock-version = 1\n[builder]\nimage = \"" & image & "\"\nsignature = \"x\"\n"
+    check parseLock(text, "x.lock").isErr

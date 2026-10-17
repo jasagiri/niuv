@@ -20,3 +20,5 @@
 | src/niuv/exec.nim | 未測定 |
 | src/niuv/gleambuild.nim | 未測定 |
 | src/niuv/child.nim | 未測定 |
+| src/niuv/target.nim | 未測定（K4-2 で追加） |
+| src/niuv/inbuilder.nim | 未測定（K4-2 で追加） |

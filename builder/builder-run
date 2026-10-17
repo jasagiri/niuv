@@ -1,0 +1,8 @@
+#!/bin/sh
+# The guest's program for `niuv build|lock --in-builder` (NIV-27). kite starts
+# an image program by name (--cmdline:init=PATH; the program must be in the
+# image, not in a mount), so this is the image's one entry for the host's job:
+# the host writes /ctl/run.sh (the one niuv command, in the host's own quoting)
+# into a directory it mounts read-only, and this runs it. Its exit status is the
+# guest's (kite --exit-status).
+exec /bin/sh /ctl/run.sh

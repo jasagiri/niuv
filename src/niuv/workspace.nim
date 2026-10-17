@@ -6,7 +6,8 @@ import parsetoml
 import ./[decl, errors]
 
 const
-  KnownTools* = ["erlang", "gleam", "nim"]
+  KnownTools* = ["erlang", "gleam", "kite", "nim"]
+  HostOnlyTools* = ["kite"]   ## runs on the host that starts a builder guest; no Linux target pins it
 
 type
   ToolSpec* = object

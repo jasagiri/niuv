@@ -46,7 +46,7 @@ fetch "$GLEAM_FILE" "$GLEAM_URL"
 ctx="$out/ctx"
 rm -rf "$ctx"; mkdir -p "$ctx/ws" "$ctx/ext"
 for f in "$NIM_FILE" "$OTP_FILE" "$GLEAM_FILE"; do cp "$out/dl/$f" "$ctx/$f"; done
-cp "$here/inputs.sha256" "$here/Containerfile" "$here/selftest.sh" "$here/LICENSES.md" "$ctx/"
+cp "$here/inputs.sha256" "$here/Containerfile" "$here/selftest.sh" "$here/builder-run" "$here/LICENSES.md" "$ctx/"
 
 mkdir -p "$ctx/ws/niuv/src"
 rsync -a --exclude 'tests/' "$ws/niuv/src/niuv" "$ctx/ws/niuv/src/"

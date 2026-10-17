@@ -16,6 +16,7 @@ it holds no key and knows nothing about fukai.
 | `build.sh` | Fetch, verify, stage the context, `podman build`, `podman save --format oci-dir`, write the records |
 | `import-sign.sh` | `kite import` of the OCI layout, then `kite_sign image` |
 | `run-selftest.sh`, `selftest.sh` | Start the image in a kite guest with `--mount` (source read-only, output read-write) and `--exit-status`; `selftest.sh` is the guest's program |
+| `builder-run` | The image's program for `niuv ... --in-builder`: runs `/ctl/run.sh`, which the host writes into a read-only mount (kite starts a program that is in the image, not in a mount) |
 | `records/` | What went in: `apk-info.txt`, `tools.txt`, `exe-sha256.txt`, `selftest.txt`, `build-record.md` |
 | `test/test_verify.sh` | E tests of the input check (`sh builder/test/test_verify.sh`) |
 | `LICENSES.md` | The licenses of what the image contains |

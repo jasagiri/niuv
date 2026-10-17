@@ -3,7 +3,12 @@
 ##
 ## `via = "mise"` only finds the install directory. The version and the hash
 ## are then read from the executable itself, so the lock check is the same
-## whether mise or PATH found it.
+## whether mise or PATH found it. Inside the builder guest (NIV-28) the tools
+## are on PATH and mise does not exist: `pathOnly` ignores `via` there.
+##
+## `kite` (NIV-27) is the one tool whose version cannot be read from the
+## executable: it prints no version (checked 2026-10-17, kite f293ee9b). Its
+## `version` is the declared label and the SHA-256 is what is verified.
 
 import std/[options, os, strutils]
 import ./[errors, exec, hashing, workspace]
@@ -29,9 +34,9 @@ proc onPath(exe: string): NResult[string] {.raises: [].} =
   except CatchableError as e:
     err(niuvError(ekIo, "searching PATH for " & exe & ": " & e.msg))
 
-proc locate(spec: ToolSpec): NResult[string] {.raises: [].} =
+proc locate(spec: ToolSpec, pathOnly: bool): NResult[string] {.raises: [].} =
   let exe = exeName(spec.name)
-  case spec.via
+  case (if pathOnly: "" else: spec.via)
   of "mise":
     let mise = ?onPath("mise")
     if mise.len == 0: return toolErr[string]("tool " & spec.name & ": via = \"mise\" but mise is not on PATH")
@@ -71,12 +76,15 @@ proc versionOf(spec: ToolSpec, exe: string): NResult[string] {.raises: [].} =
     let r = ?runProcess(erl, @["-noshell", "-eval", probe])
     if r.code != 0: return toolErr[string]("tool erlang: " & erl & " failed: " & r.output.strip())
     ok(r.output.strip())
+  of "kite":
+    # Nothing to read: see the module comment.
+    ok(spec.version)
   else:
     toolErr[string]("tool " & spec.name & " is not one niuv drives")
 
-proc probeTool*(spec: ToolSpec): NResult[ToolInfo] {.raises: [].} =
+proc probeTool*(spec: ToolSpec, pathOnly = false): NResult[ToolInfo] {.raises: [].} =
   ## Finds the tool, reads its real version and requires it to equal the pin.
-  let found = ?locate(spec)
+  let found = ?locate(spec, pathOnly)
   var real: string
   try:
     real = expandFilename(found)
@@ -89,14 +97,14 @@ proc probeTool*(spec: ToolSpec): NResult[ToolInfo] {.raises: [].} =
   ok(ToolInfo(name: spec.name, version: actual, exe: real, sha256: ?sha256File(real),
               binDir: parentDir(found)))
 
-proc probeTools*(ws: Workspace, names: openArray[string]): NResult[seq[ToolInfo]] {.raises: [].} =
+proc probeTools*(ws: Workspace, names: openArray[string], pathOnly = false): NResult[seq[ToolInfo]] {.raises: [].} =
   ## The named tools, each of which the workspace must pin.
   var infos: seq[ToolInfo]
   for n in names:
     let spec = ws.tool(n)
     if spec.isNone:
       return toolErr[seq[ToolInfo]]("the workspace pins no [tools." & n & "] in " & ws.file)
-    infos.add ?probeTool(spec.get)
+    infos.add ?probeTool(spec.get, pathOnly)
   ok(infos)
 
 proc pathWith*(tools: openArray[ToolInfo]): string {.raises: [].} =

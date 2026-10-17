@@ -40,7 +40,7 @@ niuv は **ビルド** だけを受け持つ。**配る**（公開、鍵の付�
 
 | 約束 | 規則 | 使い手 |
 |---|---|---|
-| 目録 `niuv.manifest.cbor`: 成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`）・SHA-256・大きさ。場所は載せない。署名しない | NIV-18 | delivery は Nim から `niuv/manifest` を読み、目録から署名する頭を作る（目録そのものは署名しない。平文の SHA-256 を頭に出さないため） |
+| 目録 `niuv.manifest.cbor`: 成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`）・SHA-256・大きさ。場所は載せない。署名しない。形式の版 2（NIV-29）は目標（`aarch64-linux-musl` など）と、beam を作った OTP の版（beam が無ければ空）も載せる。版 1 も読む（目標・OTP は不明） | NIV-18、NIV-29 | delivery は Nim から `niuv/manifest` を読み、目録から署名する頭を作る（目録そのものは署名しない。平文の SHA-256 を頭に出さないため）。版 1 と版 2 のどちらの目録も封じられる |
 | 置き場: Nim の実行ファイルは `<out>/<bin 名>`、Gleam の `.beam` は `<out>/beam/<アプリ>/<モジュール>.beam` | NIV-15、NIV-23 | delivery は目録の名前と SHA-256 で成果物を探して照らす |
 | 決まったバイト列: 同じ入力からは、置いた場所によらず同じ `.beam` | NIV-17 | 版の差分（変わったモジュールだけを取る）が成り立つ前提 |
 | 腐海の Nim の子としての入口: `niuv child` は nim-frames の枠で 1 つのビルドの頼みを受け、目録のバイト列を返す | NIV-21 | delivery の公開のエージェントが `niuv child` を子として起こし、ビルドを頼む（ロックは人か試験が `niuv lock` で作る） |
@@ -48,13 +48,19 @@ niuv は **ビルド** だけを受け持つ。**配る**（公開、鍵の付�
 ## 使い方
 
 ```sh
-niuv lock [--workspace FILE]                 # ツール・パッケージ・外の依存を中身のハッシュで固定する
+niuv lock [--workspace FILE]                 # ツール・パッケージ・外の依存を中身のハッシュで固定する（niuv.lock）
 niuv check <package>                         # 閉包を依存が先の順に並べる
 niuv build <package> [--out DIR] [--bin NAME]... [--stage DIR]
 niuv child                                   # nim-frames の枠で 1 つのビルドの頼みを受ける（腐海の子）
+
+# Linux の目標（ADR-NIUV-0002）: ホストの macOS から、署名したビルド用の像の中で（kite のゲスト、網なし）
+niuv lock  --target aarch64-linux-musl --in-builder --builder NAME@sha256:<digest> [ゲストの旗]
+niuv build <package> --target aarch64-linux-musl --in-builder --out DIR [--signature FILE] [--hex-cache DIR] [ゲストの旗]
 ```
 
 `build` はロックが無い・古い、ツールの版か実行ファイルがロックと違う、閉包に同じ外の依存が 2 つの版で来る、のどれかで断る。出力先には成果物と `niuv.manifest.cbor`、`niuv.sbom.cdx.json` だけが置かれ、コンパイラの作業場（nimcache）と Gleam の写しは置き場の根（`--stage`、既定は一時ディレクトリの `niuv-stage`）の下に置かれる。
+
+`--target T` を付けると、ロックは `niuv.<T>.lock` になる（付けなければ `niuv.lock`）。niuv は自分が走っている機械の目標（`aarch64-macos-none` か `aarch64-linux-musl`）だけを作り、別の目標は `--in-builder`（kite のゲストの中で niuv を走らせる）で作る。`--in-builder` は `niuv.<T>.lock` の `[builder] image = "NAME@sha256:…"` の像だけを起こし、終わったあとにホストが目録を読み直して、全成果物の SHA-256 と大きさを自分で取り直す（ゲストの出力は信じない。目録に無いファイルがあれば断る）。ホストの `niuv.lock` には `[tools.kite]` の実行ファイルの SHA-256 が要る。kite は版を表示しないので、`[tools.kite] version` は宣言の札で、照合されるのは実行ファイルの SHA-256 だけ。
 
 宣言と作業場の書き方は ADR の NIV-01〜NIV-07、例は `tests/unit/` の各ファイルの先頭にある。宣言を持たない既存のパッケージは、作業場の側の宣言から `[package] root` で指す（NIV-06）。
 
@@ -68,7 +74,7 @@ niuv child                                   # nim-frames の枠で 1 つのビ�
 
 - Nim: 同じ引数の `nim c` と同じバイト列ができる（設定ファイルと nimble の暗黙の探索を使わない）
 - Gleam: 場所の違う 2 か所からビルドして、出荷される全 `.beam`（Erlang の FFI と Hex のパッケージを含む）の SHA-256 が一致する（`tests/acceptance/test_fukai_agent.nim` で実物の `fukai/agent` を、`tests/unit/test_gleambuild.nim` で小さな例を）
-- テスト: `tests/test_all.nim` で 191 件（警告 0）。`tests/acceptance/` は兄弟のリポジトリを読むので、その外で手で流す
+- テスト: `tests/test_all.nim` で 298 件（警告 0）。kite を使う部分は偽の kite で確かめている。`tests/acceptance/` は兄弟のリポジトリや実物の kite を使うので、その外で手で流す
 - 確かめていない: Linux・Windows、gleam 1.19.1 と OTP 29.1.1 以外の版、`gleam` が Hex から取得する経路（Hex のキャッシュにある版だけで確かめた）、変異検査（`docs/quality/g2-unmeasured.md`）
 
 ## 持たない物

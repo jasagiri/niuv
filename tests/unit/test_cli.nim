@@ -253,3 +253,210 @@ suite "NIV-04 wasm is declared, not built":
     check "wasm" in r.stdout and "not built" in r.stdout
     for e in decodeManifest(readFile(d / "out" / "niuv.manifest.cbor")).get.entries:
       check e.kind != akWasm
+
+# ---- targets, per-target locks, the builder image and the guest ----------
+
+import std/[algorithm, options]
+import ../../src/niuv/[build, lock, target, toolchain, workspace]
+
+proc ownTarget(): string = $hostTarget().get
+
+const
+  foreignTarget = "aarch64-linux-musl"
+  anImage = "niuv/builder@sha256:" & "ef".repeat(32)
+
+suite "NIV-24 NIV-25 NIV-29 targets, locks and manifests through the command line":
+  test "Given a target that is not this machine's, When locked without --in-builder, Then it is refused naming --in-builder and nothing is written":
+    let d = freshDir("cli-t-foreign-lock")
+    let w = makeWorkspace(d, nimVersion())
+    let r = runCli(@["lock", "--workspace", w, "--target", foreignTarget])
+    check r.code != 0
+    check "--in-builder" in r.stderr and foreignTarget in r.stderr
+    check not fileExists(d / "niuv.lock")
+    check not fileExists(d / ("niuv." & foreignTarget & ".lock"))
+
+  test "Given a target that is not this machine's, When built without --in-builder, Then it is refused":
+    let d = freshDir("cli-t-foreign-build")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w]).code == 0
+    let r = runCli(@["build", "app", "--workspace", w, "--target", foreignTarget, "--out", d / "out"])
+    check r.code != 0
+    check "--in-builder" in r.stderr
+    check not fileExists(d / "out" / "hello")
+
+  test "Given a target niuv does not know, When locked, Then it is refused by name":
+    let d = freshDir("cli-t-unknown")
+    let r = runCli(@["lock", "--workspace", makeWorkspace(d, nimVersion()), "--target", "x86_64-linux-glibc"])
+    check r.code != 0
+    check "x86_64-linux-glibc" in r.stderr
+
+  test "Given no --target, When locked and built, Then niuv.lock is used as before":
+    let d = freshDir("cli-t-none")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w]).code == 0
+    check fileExists(d / "niuv.lock")
+    check runCli(@["build", "app", "--workspace", w, "--out", d / "out"]).code == 0
+
+  test "Given this machine's own target named, When locked and built, Then niuv.<target>.lock is written and read":
+    let d = freshDir("cli-t-own")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w, "--target", ownTarget()]).code == 0
+    check fileExists(d / ("niuv." & ownTarget() & ".lock"))
+    check not fileExists(d / "niuv.lock")
+    let r = runCli(@["build", "app", "--workspace", w, "--target", ownTarget(), "--out", d / "out"])
+    check r.code == 0
+    check "hello" in r.stdout
+
+  test "Given only niuv.lock, When built with this machine's target named, Then it is refused naming niuv.<target>.lock":
+    let d = freshDir("cli-t-own-nolock")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w]).code == 0
+    let r = runCli(@["build", "app", "--workspace", w, "--target", ownTarget(), "--out", d / "out"])
+    check r.code != 0
+    check ("niuv." & ownTarget() & ".lock") in r.stderr
+
+  test "Given only a target lock, When built without --target, Then it is refused asking for niuv lock":
+    let d = freshDir("cli-t-lock-only-named")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w, "--target", ownTarget()]).code == 0
+    let r = runCli(@["build", "app", "--workspace", w, "--out", d / "out"])
+    check r.code != 0
+    check "niuv lock" in r.stderr
+
+  test "Given a stale target lock, When built, Then the message tells to lock with the target":
+    let d = freshDir("cli-t-stale")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w, "--target", ownTarget()]).code == 0
+    writeFile(d / "lib" / "src" / "greeter.nim", "proc greet*(n: string): string = \"changed\"\n")
+    let r = runCli(@["build", "app", "--workspace", w, "--target", ownTarget(), "--out", d / "out"])
+    check r.code != 0
+    check "niuv lock --target " & ownTarget() in r.stderr
+
+  test "Given a native build, When its manifest is read, Then it is format version 2 with this machine's target and no OTP":
+    let d = freshDir("cli-t-manifest-nim")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w]).code == 0
+    check runCli(@["build", "app", "--workspace", w, "--out", d / "out"]).code == 0
+    let m = decodeManifest(readFile(d / "out" / "niuv.manifest.cbor")).get
+    check m.formatVersion == 2
+    check m.target == ownTarget()
+    check m.otpVersion == ""
+
+  test "Given a build with beams, When its manifest is read, Then the OTP version is the pinned erlang's":
+    let d = freshDir("cli-t-manifest-beam")
+    let w = makeMixed(d)
+    check runCli(@["lock", "--workspace", w]).code == 0
+    check buildMixed(d, w).code == 0
+    let m = decodeManifest(readFile(d / "out" / "niuv.manifest.cbor")).get
+    check m.otpVersion == realErlang().version
+    check m.target == ownTarget()
+
+  test "Given a Linux target, When the tools to lock are chosen, Then kite is left out; for macOS it is kept":
+    let d = freshDir("cli-t-hostonly")
+    writeTree(d, {"a/niuv.toml": pkgToml("a", "\n[nim]\n"), "a/src/a.nim": "discard",
+                  "niuv.workspace.toml": "[workspace]\nmembers = [\"a\"]\n[tools.nim]\nversion = \"2.2.12\"\n[tools.kite]\nversion = \"0.1.0\"\n"})
+    let ws = loadWorkspace(d / "niuv.workspace.toml").get
+    check lockedToolNames(ws, parseTarget("aarch64-linux-musl").get).sorted == @["nim"]
+    check lockedToolNames(ws, parseTarget("aarch64-macos-none").get).sorted == @["kite", "nim"]
+
+suite "NIV-26 the builder image through the command line":
+  test "Given --builder with a digest, When locked for the target, Then the lock holds [builder]":
+    let d = freshDir("cli-b-write")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w, "--target", ownTarget(), "--builder", anImage]).code == 0
+    let l = readLock(loadWorkspace(w).get, ownTarget()).get
+    check l.builder.get.image == anImage
+
+  test "Given a lock with a builder, When locked again without --builder, Then the builder stays":
+    let d = freshDir("cli-b-keep")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w, "--target", ownTarget(), "--builder", anImage]).code == 0
+    check runCli(@["lock", "--workspace", w, "--target", ownTarget()]).code == 0
+    check readLock(loadWorkspace(w).get, ownTarget()).get.builder.get.image == anImage
+
+  test "Given --builder with a tag, When locked, Then it is refused and nothing is written":
+    let d = freshDir("cli-b-tag")
+    let w = makeWorkspace(d, nimVersion())
+    let r = runCli(@["lock", "--workspace", w, "--target", ownTarget(), "--builder", "niuv/builder:latest"])
+    check r.code != 0
+    check "sha256" in r.stderr
+    check not fileExists(d / ("niuv." & ownTarget() & ".lock"))
+
+  test "Given --builder without --target, When locked, Then it is a usage error":
+    let d = freshDir("cli-b-notarget")
+    let r = runCli(@["lock", "--workspace", makeWorkspace(d, nimVersion()), "--builder", anImage])
+    check r.code == 2
+    check "--target" in r.stderr
+
+suite "NIV-27 NIV-28 option rules":
+  test "Given --in-builder without --target, When run, Then it is a usage error":
+    let d = freshDir("cli-o-intarget")
+    let r = runCli(@["build", "app", "--workspace", makeWorkspace(d, nimVersion()), "--in-builder"])
+    check r.code == 2
+    check "--target" in r.stderr
+
+  test "Given the guest's options without --in-builder, When run, Then each is a usage error":
+    let d = freshDir("cli-o-guestopts")
+    let w = makeWorkspace(d, nimVersion())
+    for o in ["--signature", "--kernel", "--initrd", "--cpu", "--memory", "--hex-cache"]:
+      let r = runCli(@["build", "app", "--workspace", w, o, "x"])
+      check r.code == 2
+      check o in r.stderr
+
+  test "Given --in-builder and --in-guest together, When run, Then it is a usage error":
+    let d = freshDir("cli-o-both")
+    let r = runCli(@["build", "app", "--workspace", makeWorkspace(d, nimVersion()), "--target", foreignTarget,
+                     "--in-builder", "--in-guest"])
+    check r.code == 2
+
+  test "Given --external-root without --in-guest, When run, Then it is a usage error":
+    let d = freshDir("cli-o-extroot")
+    let r = runCli(@["lock", "--workspace", makeWorkspace(d, nimVersion()), "--external-root", d])
+    check r.code == 2
+    check "--in-guest" in r.stderr
+
+  test "Given a --cpu that is not a number, When run with --in-builder, Then it is a usage error":
+    let d = freshDir("cli-o-cpu")
+    let r = runCli(@["build", "app", "--workspace", makeWorkspace(d, nimVersion()), "--target", foreignTarget,
+                     "--in-builder", "--cpu", "many"])
+    check r.code == 2
+
+  test "Given --lock-out, When locked, Then the lock is written there and not next to the workspace":
+    let d = freshDir("cli-o-lockout")
+    let w = makeWorkspace(d, nimVersion())
+    check runCli(@["lock", "--workspace", w, "--target", ownTarget(), "--lock-out", d / "elsewhere.lock"]).code == 0
+    check fileExists(d / "elsewhere.lock")
+    check not fileExists(d / ("niuv." & ownTarget() & ".lock"))
+
+  test "Given --in-guest and a workspace that says via mise, When locked with no mise on PATH, Then the tool is found on PATH":
+    let d = freshDir("cli-g-via")
+    writeTree(d, {"a/niuv.toml": pkgToml("a", "\n[nim]\n"), "a/src/a.nim": "discard",
+                  "niuv.workspace.toml": "[workspace]\nmembers = [\"a\"]\n[tools.nim]\nversion = \"" & nimVersion() &
+                  "\"\nvia = \"mise\"\n"})
+    createDir(d / "bin")
+    createSymlink(realNim().exe, d / "bin" / "nim")
+    let w = d / "niuv.workspace.toml"
+    let oldPath = getEnv("PATH")
+    putEnv("PATH", d / "bin")
+    try:
+      let hostWay = runCli(@["lock", "--workspace", w])
+      check hostWay.code != 0
+      check "mise" in hostWay.stderr
+      let guestWay = runCli(@["lock", "--workspace", w, "--in-guest"])
+      check guestWay.code == 0
+      check fileExists(d / "niuv.lock")
+    finally:
+      putEnv("PATH", oldPath)
+
+  test "Given --in-guest and --external-root, When locked, Then the external is found there and not in the workspace's own roots":
+    let d = freshDir("cli-g-ext")
+    writeTree(d, {"a/niuv.toml": pkgToml("a", "\n[nim]\n[dependencies.external.ext]\nsource = \"github.com/a/ext\"\nversion = \"1.2.3\"\n"),
+                  "a/src/a.nim": "discard",
+                  "guestroot/githubcom_aext_123/ext.nim": "discard",
+                  "niuv.workspace.toml": "[workspace]\nmembers = [\"a\"]\n[external]\nroots = [\"hostroot\"]\n[tools.nim]\nversion = \"" &
+                  nimVersion() & "\"\n"})
+    let w = d / "niuv.workspace.toml"
+    check runCli(@["lock", "--workspace", w]).code != 0
+    let r = runCli(@["lock", "--workspace", w, "--in-guest", "--external-root", d / "guestroot"])
+    check r.code == 0
+    check "1 external dependencies" in r.stdout
