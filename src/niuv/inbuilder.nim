@@ -18,7 +18,7 @@
 ## kite then refuses to start (checked 2026-10-17 on the K4-1 image).
 
 import std/[algorithm, options, os, sequtils, strutils]
-import ./[artifact, build, decl, errors, exec, hashing, lock, manifest, resolve, target, toolchain, workspace]
+import ./[artifact, build, decl, errors, exec, gleambuild, hashing, lock, manifest, resolve, target, toolchain, workspace]
 
 const
   GuestEntry* = "/usr/local/bin/builder-run"   ## in the image: runs /ctl/run.sh
@@ -294,12 +294,6 @@ proc verifyBuilderOutput*(outDir: string, want: Expectation): NResult[Verified] 
   ok(Verified(doc: doc, outcome: outcome))
 
 # ------------------------------------------------------------ the two commands
-
-proc defaultHexCache(): string {.raises: [].} =
-  ## Where gleam keeps the Hex packages it downloaded on this machine.
-  let home = getHomeDir()
-  if hostOS == "macosx": home / "Library" / "Caches" / "gleam" / "hex" / "hexpm" / "packages"
-  else: home / ".cache" / "gleam" / "hex" / "hexpm" / "packages"
 
 proc hostKite(ws: Workspace): NResult[ToolInfo] {.raises: [].} =
   ## NIV-27: kite is a tool of the host's own lock, version and SHA-256.

@@ -1,6 +1,6 @@
 ## E tests for the Gleam build: NIV-16 (plumbing) and NIV-17 (fixed bytes).
 
-import std/[algorithm, os, sequtils, strutils, unittest]
+import std/[algorithm, os, osproc, sequtils, strutils, unittest]
 import ../../src/niuv/[artifact, errors, gleambuild, hashing, resolve, workspace]
 import support
 
@@ -12,28 +12,81 @@ proc pkgToml(name: string, extra = ""): string =
 ## `app` (gleam name `app`) depends on `lib` (gleam name `lib_gl`), which sits
 ## at a different depth: the path in app's gleam.toml is not `../lib`.
 proc makeWorkspace(dir: string, appGleamDeps = "lib_gl = { path = \"../deep/lib\" }\n",
-                   niuvDeps = "[dependencies]\nworkspace = [\"lib\"]\n", withManifest = false): Workspace =
+                   niuvDeps = "[dependencies]\nworkspace = [\"lib\"]\n", withManifest = false,
+                   hexSum = ""): Workspace =
   writeTree(dir, {
     "app/niuv.toml": pkgToml("app", "\n[gleam]\n" & niuvDeps),
     "app/gleam.toml": "name = \"app\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\nlicences = [\"Apache-2.0\"]\n\n" &
       "[dependencies]\n" & appGleamDeps,
-    "app/src/app.gleam": "import lib_gl\n\npub fn run() -> Int {\n  lib_gl.answer()\n}\n",
+    "app/src/app.gleam": (if hexSum.len > 0: "import hexlib\nimport lib_gl\n\npub fn run() -> Int {\n  lib_gl.answer() + hexlib.one()\n}\n"
+                          else: "import lib_gl\n\npub fn run() -> Int {\n  lib_gl.answer()\n}\n"),
     "app/src/app_ffi.erl": "-module(app_ffi).\n-export([ping/0]).\nping() -> ok.\n",
     "app/test/app_test.gleam": "pub fn main() {\n  Nil\n}\n",
     "deep/lib/niuv.toml": pkgToml("lib", "\n[gleam]\n"),
     "deep/lib/gleam.toml": "name = \"lib_gl\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\nlicences = [\"MIT\"]\n",
     "deep/lib/src/lib_gl.gleam": "pub fn answer() -> Int {\n  42\n}\n",
     "niuv.workspace.toml": "[workspace]\nmembers = [\"app\", \"deep/lib\"]\n"})
-  if withManifest:
+  if hexSum.len > 0:
+    writeFile(dir / "app" / "gleam.toml", readFile(dir / "app" / "gleam.toml") & "hexlib = \">= 1.0.0 and < 2.0.0\"\n")
+    writeFile(dir / "app" / "manifest.toml",
+      "packages = [\n" &
+      "  { name = \"hexlib\", version = \"1.0.0\", build_tools = [\"gleam\"], requirements = [], otp_app = \"hexlib\", source = \"hex\", outer_checksum = \"" & hexSum & "\" },\n" &
+      "  { name = \"lib_gl\", version = \"0.1.0\", build_tools = [\"gleam\"], requirements = [], source = \"local\", path = \"../deep/lib\" },\n" &
+      "]\n")
+  elif withManifest:
     writeFile(dir / "app" / "manifest.toml",
       "# Do not manually edit this file, it is managed by Gleam.\n\npackages = [\n" &
       "  { name = \"lib_gl\", version = \"0.1.0\", build_tools = [\"gleam\"], requirements = [], source = \"local\", path = \"../deep/lib\" },\n" &
       "]\n\n[requirements]\nlib_gl = { path = \"../deep/lib\" }\n")
   loadWorkspace(dir / "niuv.workspace.toml").get
 
+proc sh(cmd: string) =
+  let (o, code) = execCmdEx(cmd)
+  doAssert code == 0, cmd & ": " & o
+
+proc toOctal(n, width: int): string =
+  var v = n
+  while v > 0:
+    result = $(v mod 8) & result
+    v = v div 8
+  result = repeat('0', max(0, width - result.len)) & result
+
+proc ustar(name, content: string, kind = '0', link = ""): string =
+  ## One tar member, written by hand: tar programs refuse to make a name with `..` in it.
+  var h = newString(512)
+  proc put(at: int, v: string) =
+    for i, c in v: h[at + i] = c
+  put(0, name); put(100, "0000644\0"); put(108, "0000000\0"); put(116, "0000000\0")
+  put(124, toOctal(content.len, 11) & "\0"); put(136, "00000000000\0")
+  put(148, "        "); h[156] = kind; put(157, link); put(257, "ustar\0" & "00")
+  var sum = 0
+  for c in h: sum += ord(c)
+  put(148, toOctal(sum, 6) & "\0 ")
+  result = h & content & newString((512 - content.len mod 512) mod 512)
+
+proc makeHexPackage(d, name, version: string, extra: openArray[(string, string)] = [], contents = ""): string =
+  ## A Hex archive in `<d>/hexcache/<OUTER CHECKSUM>.tar`; returns the checksum.
+  ## `contents` replaces the packed sources (an already compressed contents.tar.gz).
+  let src = d / "hexsrc" / name
+  let outer = d / "hexouter" / name
+  removeDir(src); removeDir(outer)
+  writeTree(src, {"gleam.toml": "name = \"" & name & "\"\nversion = \"" & version & "\"\nlicences = [\"MIT\"]\n",
+                  "src" / (name & ".gleam"): "pub fn one() -> Int {\n  1\n}\n"})
+  for (rel, content) in extra: writeTree(src, {rel: content})
+  createDir(outer)
+  if contents.len > 0: writeFile(outer / "contents.tar.gz", contents)
+  else: sh("tar czf " & quoteShell(outer / "contents.tar.gz") & " -C " & quoteShell(src) & " gleam.toml src")
+  writeTree(outer, {"VERSION": "3", "CHECKSUM": "x", "metadata.config": "{<<\"name\">>,<<\"" & name & "\">>}.\n"})
+  createDir(d / "hexcache")
+  let tmp = d / "hexcache" / (name & ".tar")
+  sh("tar cf " & quoteShell(tmp) & " -C " & quoteShell(outer) & " VERSION CHECKSUM metadata.config contents.tar.gz")
+  let sum = sha256File(tmp).get.toUpperAscii
+  moveFile(tmp, d / "hexcache" / (sum & ".tar"))
+  sum
+
 proc build(d: string, ws: Workspace, stageRoot: string): NResult[GleamResult] =
   let c = resolveClosure(ws, "app").get
-  buildGleam(realGleam(), realErlang(), c, d / "out", stageRoot)
+  buildGleam(realGleam(), realErlang(), c, d / "out", stageRoot, d / "hexcache")
 
 proc beamHashes(r: GleamResult): seq[string] =
   r.artifacts.mapIt(it.name & " " & it.sha256).sorted
@@ -60,13 +113,27 @@ suite "NIV-16 gleam plumbing":
     check r.isOk
     check "app_test" notin r.get.artifacts.mapIt(it.name)
 
-  test "Given a build, When the stage is read, Then path dependencies point at staged copies":
-    let d = freshDir("gl-stagetoml")
+  test "Given a build, When the stage is read, Then each package is compiled into lib/<name>/ebin from where its sources are":
+    let d = freshDir("gl-stagelib")
     let r = build(d, makeWorkspace(d), d / "stage").get
-    let toml = readFile(r.stageDir / "app" / "gleam.toml")
-    check "../lib_gl" in toml
-    check "deep" notin toml
-    check dirExists(r.stageDir / "lib_gl")
+    check fileExists(r.stageDir / "lib" / "app" / "ebin" / "app.beam")
+    check fileExists(r.stageDir / "lib" / "lib_gl" / "ebin" / "lib_gl.beam")
+    check not dirExists(r.stageDir / "app")   # nothing is copied: the packages are compiled in place
+
+  test "Given a package that imports a module of a package it does not depend on, When built, Then it is refused":
+    let d = freshDir("gl-sees-deps")
+    let ws = makeWorkspace(d, appGleamDeps = "lib_gl = { path = \"../deep/lib\" }\n")
+    writeFile(d / "deep" / "lib" / "gleam.toml", readFile(d / "deep" / "lib" / "gleam.toml") & "\n[dependencies]\n")
+    createDir(d / "other")
+    writeTree(d, {"other/niuv.toml": pkgToml("other", "\n[gleam]\n"),
+                  "other/gleam.toml": "name = \"other\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\n",
+                  "other/src/other.gleam": "pub fn x() -> Int {\n  1\n}\n"})
+    writeFile(d / "niuv.workspace.toml", "[workspace]\nmembers = [\"app\", \"deep/lib\", \"other\"]\n")
+    writeFile(d / "app" / "niuv.toml", pkgToml("app", "\n[gleam]\n[dependencies]\nworkspace = [\"lib\", \"other\"]\n"))
+    writeFile(d / "deep" / "lib" / "src" / "lib_gl.gleam", "import other\n\npub fn answer() -> Int {\n  other.x()\n}\n")
+    let r = build(d, loadWorkspace(d / "niuv.workspace.toml").get, d / "stage")
+    check r.isErr
+    check "other" in r.error.msg
 
   test "Given a build, When the sources are looked at afterwards, Then they are untouched":
     let d = freshDir("gl-untouched")
@@ -77,13 +144,69 @@ suite "NIV-16 gleam plumbing":
     check not dirExists(d / "app" / "build")
     check not dirExists(d / "deep" / "lib" / "build")
 
-  test "Given a manifest.toml with local paths, When built, Then the staged manifest is rewritten and the build passes":
+  test "Given a manifest.toml with local paths and no Hex entry, When built, Then it is not needed to know them and the build passes":
     let d = freshDir("gl-manifest")
     let r = build(d, makeWorkspace(d, withManifest = true), d / "stage")
     check r.isOk
-    let m = readFile(r.get.stageDir / "app" / "manifest.toml")
-    check "../lib_gl" in m
-    check "deep" notin m
+
+  test "Given a Hex dependency pinned by the root's manifest.toml, When built from the Hex copy, Then its beams ship and it is listed with its license":
+    let d = freshDir("gl-hex")
+    let sum = makeHexPackage(d, "hexlib", "1.0.0")
+    let r = build(d, makeWorkspace(d, hexSum = sum), d / "stage")
+    check r.isOk
+    check ("beam" / "hexlib" / "hexlib.beam") in r.get.artifacts.mapIt(it.path.relativePath(d / "out"))
+    check r.get.hex.len == 1
+    check r.get.hex[0].name == "hexlib"
+    check r.get.hex[0].version == "1.0.0"
+    check r.get.hex[0].licenses == @["MIT"]
+
+  test "Given a Hex archive that is not the one the lock names, When built, Then it is refused naming both checksums":
+    let d = freshDir("gl-hex-sum")
+    let sum = makeHexPackage(d, "hexlib", "1.0.0")
+    let wrong = "A".repeat(64)
+    moveFile(d / "hexcache" / (sum & ".tar"), d / "hexcache" / (wrong & ".tar"))
+    let r = build(d, makeWorkspace(d, hexSum = wrong), d / "stage")
+    check r.isErr
+    check sum in r.error.msg and wrong in r.error.msg
+
+  test "Given a Hex package that is not in the Hex copy, When built, Then it is refused naming it and its archive":
+    let d = freshDir("gl-hex-missing")
+    let sum = makeHexPackage(d, "hexlib", "1.0.0")
+    removeFile(d / "hexcache" / (sum & ".tar"))
+    let r = build(d, makeWorkspace(d, hexSum = sum), d / "stage")
+    check r.isErr
+    check "hexlib" in r.error.msg and sum in r.error.msg
+
+  test "Given a Hex dependency that the root's manifest.toml does not pin, When built, Then it is refused naming it":
+    let d = freshDir("gl-hex-unpinned")
+    discard makeHexPackage(d, "hexlib", "1.0.0")
+    let ws = makeWorkspace(d, hexSum = "B".repeat(64))
+    writeFile(d / "app" / "manifest.toml", "packages = []\n")
+    let r = build(d, ws, d / "stage")
+    check r.isErr
+    check "hexlib" in r.error.msg and "manifest.toml" in r.error.msg
+
+  test "Given a Hex archive whose contents name a path outside themselves, When built, Then it is refused and nothing is written there":
+    let d = freshDir("gl-hex-escape")
+    let tarMember = ustar("../escaped.txt", "x") & newString(1024)
+    writeFile(d / "evil.tar", tarMember)
+    sh("gzip -c " & quoteShell(d / "evil.tar") & " > " & quoteShell(d / "evil.tar.gz"))
+    let sum = makeHexPackage(d, "hexlib", "1.0.0", contents = readFile(d / "evil.tar.gz"))
+    let r = build(d, makeWorkspace(d, hexSum = sum), d / "stage")
+    check r.isErr
+    check "outside" in r.error.msg
+    check not fileExists(d / "stage" / "escaped.txt")
+
+  test "Given a Hex archive that holds a symbolic link, When built, Then it is refused":
+    let d = freshDir("gl-hex-link")
+    let src = d / "linksrc"
+    writeTree(src, {"gleam.toml": "name = \"hexlib\"\nversion = \"1.0.0\"\n", "src/hexlib.gleam": "pub fn one() -> Int {\n  1\n}\n"})
+    createSymlink("/etc/hosts", src / "src" / "link.txt")
+    sh("tar czf " & quoteShell(d / "links.tar.gz") & " -C " & quoteShell(src) & " gleam.toml src")
+    let sum = makeHexPackage(d, "hexlib", "1.0.0", contents = readFile(d / "links.tar.gz"))
+    let r = build(d, makeWorkspace(d, hexSum = sum), d / "stage")
+    check r.isErr
+    check "symbolic link" in r.error.msg
 
   test "Given a path dependency that the closure does not hold, When built, Then it is refused naming it":
     let d = freshDir("gl-undeclared")
@@ -147,6 +270,17 @@ suite "NIV-17 fixed bytes":
     check beamHashes(ra.get) == beamHashes(rb.get)
     check ra.get.stageDir != rb.get.stageDir
 
+  test "Given a Hex dependency, When built in two places, Then all beams, the Hex ones included, are equal":
+    let a = freshDir("gl-hexfixed-a")
+    let b = freshDir("gl-hexfixed-b" / "deeper")
+    let sa = makeHexPackage(a, "hexlib", "1.0.0")
+    let sb = makeHexPackage(b, "hexlib", "1.0.0")
+    let ra = build(a, makeWorkspace(a, hexSum = sa), a / "s")
+    let rb = build(b, makeWorkspace(b, hexSum = sb), b / "elsewhere" / "s")
+    check ra.isOk and rb.isOk
+    check "hexlib" in ra.get.artifacts.mapIt(it.name)
+    check beamHashes(ra.get) == beamHashes(rb.get)
+
   test "Given the Erlang FFI beam, When built in two places, Then its SHA-256 is equal":
     let a = freshDir("gl-ffi-a")
     let b = freshDir("gl-ffi-b" / "x")
@@ -174,11 +308,12 @@ suite "NIV-17 fixed bytes":
     let d = freshDir("gl-stale")
     let ws = makeWorkspace(d)
     let first = build(d, ws, d / "s").get
-    writeFile(first.stageDir / "app" / "leftover.txt", "stale")
-    writeFile(first.stageDir / "app" / "src" / "ghost.gleam", "this would not compile")
+    writeFile(first.stageDir / "leftover.txt", "stale")
+    writeFile(first.stageDir / "lib" / "app" / "ebin" / "ghost.beam", "stale")
     let again = build(d, ws, d / "s")
     check again.isOk
-    check not fileExists(first.stageDir / "app" / "leftover.txt")
+    check not fileExists(first.stageDir / "leftover.txt")
+    check not fileExists(first.stageDir / "lib" / "app" / "ebin" / "ghost.beam")
 
   test "Given the user's ERL_COMPILER_OPTIONS, When built, Then the build is still deterministic":
     let a = freshDir("gl-env-a")
