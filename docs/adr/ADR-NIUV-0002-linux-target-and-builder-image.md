@@ -129,6 +129,7 @@ K4-3 は、完走でなく、試験の件数で確かめる（早合点を避け
 
 NIV-24〜29、31 を実装し、E テストを足した（`docs/quality/spec-coverage.md`）。実物の kite と像での受け入れ（`tests/acceptance/test_builder_guest.nim`）が通った。
 
+- **macOS の目標名は `aarch64-macos-none`**（NIV-24。libc の欄は none）。jasagiri 側の承認済み。
 - **像に入口が要った。** kite は `--cmdline:init=PATH` の PATH が像の根に在ることを要求する（mount したスクリプトは起動できない。実測: `the image root has no /ctl/run.sh to start`）。そこで像に `builder-run`（`exec /bin/sh /ctl/run.sh`）を足して作り直した。新しい digest が `[builder]` の pin（`builder/records/build-record.md`）。K4-1 の像（`f5d5b3c2…`）は入口を持たないので、`--in-builder` には使えない。
 - **ゲストの niuv は像の中の niuv。** 当初は「mount したソースからゲストで `nim c` する」案だったが、niuv の第三者の Nim ソース（parsetoml・results・checksums）は像の最終段に無い（ビルド段だけ）ので、ゲストでは組めない。像の niuv は像を作るときに記録した木（nim-cbor-det・nim-frames・nim-fdio を含む）から組まれ、それを信じる根は NIV-28 のとおり像の digest。
 - **ホストの呼び出し。** ソースは同じ絶対パスで ro に mount（読み込み先が isomorphic なので、ゲストは同じ `niuv.workspace.toml`・同じロック・同じ相対パスを読む）。出力先は `/out`（rw）、命令は `/ctl/run.sh`（ro）、gleam の Hex の写しは `/hex`（ro。ゲストがキャッシュへ写す）。kite の mount は 8 個までなので、ソースの置き場所が多いときは共通の親へまとめる（`/` までは上がらない）。`--net` は渡さない。
