@@ -171,6 +171,33 @@ jasagiri が案 B を選んだ（fukai roadmap 0.1 章 121）。niuv が閉包�
 - **直したこと（途中で見つけた）。** `findExe` は既定でシンボリックリンクをたどり、Alpine の `tar` は busybox へのリンクなので、`busybox -tf …`（`applet not found`）で起動していた。リンクをたどらないようにし、複数のプログラムを 1 つにまとめた実行ファイルへのリンクの `tar` を使う E テストを足した（赤を確かめてから直した）。
 - **旧い像の扱い。** K4-2 の像（`sha256:0f5f221a…`）は `gleam export` の道で、path 依存のある Gleam パッケージを網なしで作れない。`[builder]` の pin は新しい像へ移す。
 
+## K4-4 の結果（2026-10-17）: 断る場合を実物の kite と像で確かめた。K4 を閉じる
+
+偽の kite でしか確かめていなかった断る場合を、kite-container 0b4a0351 の木から作った kite 0.2.0 と像 `sha256:40ede3aa…` で確かめ、`tests/acceptance/test_builder_guest.nim` の `N-K4-4 acceptance` に E テストとして足した（規則 NIV-26、27）。受け入れは 5 件通り、失敗 0、コンパイラの警告 0。`test_all` は 308 件・失敗 0・警告 0（`src` は K4-3 の最後のコミットから変わっていない）。
+
+| 場合 | 結果（終了コード 1 = niuv の誤り） |
+|---|---|
+| (1a) ロックの `[builder]` を、kite の保存先にある別の像（K4-2 の `0f5f221a…`）へ書き換え、今の像の署名を渡す | kite が断る: `PIN-08 image …@sha256:0f5f221a…: the signature is valid but vouches for something else`。niuv は `the builder guest ended with status 1` として伝える。出力先に目録は無い |
+| (1b) kite が見たことの無い digest | 同じ文面で断る（署名の確かめが先） |
+| (2a) 同じ版 0.2.0 の別の kite の実行ファイル | niuv が kite を起こす前に断る: `tool kite 0.2.0: the executable … has SHA-256 fc50aa35a5e8 but niuv.lock pins 710f96e918f2`。呼び出しの控えに `run` は無い |
+| (2b) 版の違う kite（`--version` が 0.1.9） | 起こす前に断る: `tool kite: declared 0.2.0 but … is 0.1.9` |
+| (3a) 署名を一度も見ていない kite の保存先 | kite が断る: `PIN-08 … no signature (none in the store; pass one with --signature:PATH)` |
+| (3b) 存在しない署名ファイル | `PIN-08 … no signature (… does not exist)` |
+| (3c) 信じる鍵の一覧に無い鍵の署名 | `PIN-08 … the signature was made by a key kite does not trust (seWrongKey; 1 keys tried)` |
+| (4) ゲストが目録に無いファイルを、出力先の直下・`beam/demo/` に置く | ホストが断る: `the output holds evil.txt, which the manifest does not list` など |
+| (5) ゲストの書き換え: 目録の載せた Nim の実行ファイルに 1 バイト足す | `the host hashed … but the manifest says …` |
+| 同: 実行ファイルをシンボリックリンクに替える | `… is not a regular file` |
+| 同: `beam/demo/` をシンボリックリンクに替える | `the manifest lists the beam 'demo' but 0 applications … have it (one is required)` |
+| 同: 目録を壊れた中身にする / 消す | `manifest: not deterministic CBOR: truncated` / `the guest left no …/niuv.manifest.cbor` |
+| 同: 目録の SHA-256 だけ、大きさだけを偽る | `the host hashed … but the manifest says 000…` / `is 156792 bytes but the manifest says 156793` |
+| 同: 目録に `../escape` の名前、別のパッケージ名、無い beam を載せる | `which is not a file name` / `the guest built other 0.1.0, not demo 0.1.0` / `lists the beam 'ghost' but 0 applications … have it` |
+
+- 見つけたこと 1: `--signature` を渡さなくても、kite は一度確かめた署名を自分の保存先（`~/.kite/signatures`）に持つので、像は起動する。これは仕様どおりで、「署名なし」の確かめには、署名を見ていない保存先が要る（テストはそれを作る）。niuv が署名を強制するのではなく、署名の確かめは kite の PIN-08 が受け持つ（NIV-28）。
+- 見つけたこと 2: `lock --in-builder --builder X` は、既にあるロックの別の像を上書きする（NIV-26 の「`[builder]` は pin」は `build` の側の約束。`lock` の `--builder` が pin を決める操作そのもの）。ホストのコマンドラインに、ロックと違う digest を渡して `build` する口は無い。ロックを手で書き換えた場合は (1a)(1b) のとおり、署名の確かめが断る。
+- ゲストの出力の書き換えは、像を変えず、ゲストの台本（`/ctl/run.sh`）が `/out` に honest な出力の写しを作って書き換え、ホストの `verifyBuilderOutput` が 12 通りすべてを断った。受け入れた物は 0。
+
+**K4 全体（2026-10-17）。** K4-0（kite の mount と像の取り込み）、K4-1（像）、K4-2（niuv の目標・ロック・目録・ホストの再照合）、K4-3（fukai の実物をゲストで作って試験: agent 32 件、`column_child` 10 件、niuv が作った beam での試験 32 件）、K4-4（断る場合）が揃った。像の再現は約束せず、`[builder]` は `sha256:40ede3aa…`（開発用の鍵で署名）に固定する。残る物: 像の署名の本物の鍵（fukai roadmap 118）、sigstore による上流の確かめ、x86・glibc の目標、Nim の実行ファイルのゲスト間の一致（NIV-30 は beam だけを約束する。beam はホストとゲストで 53 個一致した）。
+
 ## 決めてほしい点
 
 （2026-10-17、jasagiri が 1〜9 を推奨どおり承認。以下は承認された案の理由として残す。）

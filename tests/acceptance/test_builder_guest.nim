@@ -12,11 +12,12 @@
 ##   NIUV_ACC_KERNEL, NIUV_ACC_INITRD   the signed kernel and initramfs
 ##   NIUV_ACC_HEX          gleam's Hex packages directory (.../hex/hexpm/packages)
 ##   NIUV_ACC_SCRATCH      a directory outside the repository for the workspace and outputs
+##   NIUV_ACC_KITE_SIGN    the `kite_sign` executable (the K4-4 suite signs with a key kite does not trust)
 ##
 ##   nim c -r --opt:speed tests/acceptance/test_builder_guest.nim
 
-import std/[algorithm, options, os, sequtils, strutils, unittest]
-import ../../src/niuv/[artifact, cli, errors, inbuilder, lock, manifest]
+import std/[algorithm, options, os, sequtils, strutils, times, unittest]
+import ../../src/niuv/[artifact, cli, errors, exec, hashing, inbuilder, lock, manifest]
 
 proc need(name: string): string =
   result = getEnv(name)
@@ -123,3 +124,227 @@ suite "N-K4-2 acceptance: the builder guest":
       putEnv("PATH", oldPath)
       putEnv("HOME", oldHome)
       cleanRuns()
+
+
+# ------------------------------------------------------------------ K4-4
+#
+# What the host refuses, with the real kite and the real image. The fake-kite
+# unit tests (tests/unit/test_inbuilder.nim) say what niuv asks of kite; these
+# say that kite and the host really refuse.
+
+const k44Scratch = "niuv-acc-k44"
+
+type Prepared = object
+  w: string          ## the workspace file
+  scratch: string
+  base: string       ## an honest output of the guest, verified by the host
+
+var prepared: Prepared
+
+template inKiteEnv(body: untyped) =
+  let oldPath = getEnv("PATH")
+  let oldHome = getEnv("HOME")
+  putEnv("PATH", need("NIUV_ACC_KITE_DIR") & ":" & oldPath)
+  putEnv("HOME", need("NIUV_ACC_KITE_HOME"))
+  try:
+    body
+  finally:
+    putEnv("PATH", oldPath)
+    putEnv("HOME", oldHome)
+
+proc k44Want(): Expectation =
+  Expectation(package: "demo", version: "0.1.0", target: linux, bins: @["demo-hello"], pinnedOtp: otpV)
+
+proc prepare(): Prepared =
+  ## Once: the workspace, both locks, and one honest guest output.
+  if prepared.w.len > 0: return prepared
+  let scratch = need("NIUV_ACC_SCRATCH") / k44Scratch
+  removeDir(scratch)
+  makeWorkspace(scratch)
+  let w = scratch / "niuv.workspace.toml"
+  inKiteEnv:
+    doAssert runCli(@["lock", "--workspace", w]).code == 0
+    let lk = runCli(@["lock", "--workspace", w, "--target", linux, "--in-builder", "--builder", need("NIUV_ACC_IMAGE"),
+                      "--stage", scratch / "stage"] & guestFlags())
+    doAssert lk.code == 0, lk.stderr
+    let b = runCli(@["build", "demo", "--workspace", w, "--target", linux, "--in-builder", "--out", scratch / "base",
+                     "--stage", scratch / "stage"] & guestFlags())
+    doAssert b.code == 0, b.stderr
+  prepared = Prepared(w: w, scratch: scratch, base: scratch / "base")
+  prepared
+
+proc buildArgs(p: Prepared, outDir: string, flags: seq[string]): seq[string] =
+  @["build", "demo", "--workspace", p.w, "--target", linux, "--in-builder", "--out", outDir,
+    "--stage", p.scratch / "stage"] & flags
+
+proc flagsWithout(drop: string): seq[string] =
+  ## The guest flags minus one option and its value.
+  let all = guestFlags()
+  var i = 0
+  while i < all.len:
+    if all[i] == drop: i += 2
+    else:
+      result.add all[i]
+      inc i
+
+proc noGuestOutput(dir: string): bool =
+  not fileExists(dir / "niuv.manifest.cbor")
+
+suite "N-K4-4 acceptance: the real kite and the real image refuse what they should":
+  # SPEC: NIV-26
+  test "Given a lock whose [builder] names another image, When built in the builder, Then kite refuses it and nothing is built":
+    let p = prepare()
+    let lockFile = p.scratch / ("niuv." & linux & ".lock")
+    let original = readFile(lockFile)
+    let image = need("NIUV_ACC_IMAGE")
+    inKiteEnv:
+      try:
+        # An image that is in kite's store and signed (the K4-2 image), but not the one the signature is for.
+        writeFile(lockFile, original.replace(image, image.split('@')[0] & "@sha256:0f5f221a3ade5f25e9ccf6f5d72adc8980efd90279ea0683adfb77fb604c0287"))
+        let old = runCli(buildArgs(p, p.scratch / "out-oldimage", guestFlags()))
+        echo "other image in the store: code ", old.code, "\n", old.stderr
+        check old.code != 0
+        check noGuestOutput(p.scratch / "out-oldimage")
+        # An image kite has never seen.
+        writeFile(lockFile, original.replace(image, image.split('@')[0] & "@sha256:" & repeat('1', 64)))
+        let unknown = runCli(buildArgs(p, p.scratch / "out-unknownimage", guestFlags()))
+        echo "unknown image: code ", unknown.code, "\n", unknown.stderr
+        check unknown.code != 0
+        check noGuestOutput(p.scratch / "out-unknownimage")
+      finally:
+        writeFile(lockFile, original)
+
+  # SPEC: NIV-27
+  test "Given a kite that is not the locked one, When built in the builder, Then niuv refuses before it starts any guest":
+    let p = prepare()
+    let real = need("NIUV_ACC_KITE_DIR") / "kite"
+    for (label, body, want) in [
+        ("another executable of the same version",
+         "echo \"$@\" >> '" & p.scratch / "kite-calls" & "'\nexec '" & real & "' \"$@\"\n", "SHA-256"),
+        ("another version",
+         "if [ \"$1\" = --version ]; then echo 'kite 0.1.9'; exit 0; fi\necho \"$@\" >> '" & p.scratch / "kite-calls" & "'\nexit 1\n", "0.1.9")]:
+      removeFile(p.scratch / "kite-calls")
+      createDir(p.scratch / "fakekite")
+      writeFile(p.scratch / "fakekite" / "kite", "#!/bin/sh\n" & body)
+      setFilePermissions(p.scratch / "fakekite" / "kite", {fpUserRead, fpUserWrite, fpUserExec})
+      let oldPath = getEnv("PATH")
+      let oldHome = getEnv("HOME")
+      putEnv("PATH", p.scratch / "fakekite" & ":" & oldPath)
+      putEnv("HOME", need("NIUV_ACC_KITE_HOME"))
+      let r = runCli(buildArgs(p, p.scratch / "out-fakekite", guestFlags()))
+      putEnv("PATH", oldPath)
+      putEnv("HOME", oldHome)
+      echo label, ": code ", r.code, "\n", r.stderr
+      check r.code != 0
+      check want in r.stderr
+      check noGuestOutput(p.scratch / "out-fakekite")
+      let calls = if fileExists(p.scratch / "kite-calls"): readFile(p.scratch / "kite-calls") else: ""
+      check "run" notin calls
+
+  # SPEC: NIV-27
+  test "Given an image without a signature, or signed by a key kite does not trust, When built in the builder, Then kite refuses and niuv says so":
+    let p = prepare()
+    inKiteEnv:
+      # kite keeps a signature that verified once (~/.kite/signatures), so "no --signature" alone is not
+      # "unsigned". A home that holds the image's blobs and the trust file but never saw a signature is.
+      let fresh = p.scratch / "home-unsigned"
+      removeDir(fresh)
+      createDir(fresh / ".kite")
+      createSymlink(need("NIUV_ACC_KITE_HOME") / ".kite" / "blobs", fresh / ".kite" / "blobs")
+      copyDir(need("NIUV_ACC_KITE_HOME") / ".config", fresh / ".config")
+      putEnv("HOME", fresh)
+      let unsigned = runCli(buildArgs(p, p.scratch / "out-unsigned", flagsWithout("--signature")))
+      putEnv("HOME", need("NIUV_ACC_KITE_HOME"))
+      echo "unsigned image: code ", unsigned.code, "\n", unsigned.stderr
+      check unsigned.code != 0
+      check "status" in unsigned.stderr
+      check noGuestOutput(p.scratch / "out-unsigned")
+      let missing = runCli(buildArgs(p, p.scratch / "out-missingsig", flagsWithout("--signature") & @["--signature", p.scratch / "no-such.sig"]))
+      echo "signature file that does not exist: code ", missing.code, "\n", missing.stderr
+      check missing.code != 0
+      check noGuestOutput(p.scratch / "out-missingsig")
+      # Signed with a key that is in nobody's trust file.
+      let key = p.scratch / "stranger.key"
+      writeFile(key, sha256Hex($getCurrentProcessId() & $epochTime()) & "\n")
+      setFilePermissions(key, {fpUserRead, fpUserWrite})
+      let image = need("NIUV_ACC_IMAGE")
+      let signed = execShellCmd(quoteShell(need("NIUV_ACC_KITE_SIGN")) & " image --key-file:" & quoteShell(key) &
+        " --repo:" & quoteShell(image.split('@')[0]) & " --digest:" & image.split('@')[1] &
+        " --out:" & quoteShell(p.scratch / "stranger.sig"))
+      check signed == 0
+      let strangerFlags = flagsWithout("--signature") & @["--signature", p.scratch / "stranger.sig"]
+      let stranger = runCli(buildArgs(p, p.scratch / "out-stranger", strangerFlags))
+      echo "untrusted key: code ", stranger.code, "\n", stranger.stderr
+      check stranger.code != 0
+      check "status" in stranger.stderr
+      check noGuestOutput(p.scratch / "out-stranger")
+
+  # SPEC: NIV-27 (4), NIV-18, NIV-23
+  test "Given a guest that rewrites its output after the build, When the host re-checks it, Then each change is refused":
+    let p = prepare()
+    # The tampered manifests are made here from the honest one, and handed to the guest read-only.
+    let honest = decodeManifest(readFile(p.base / "niuv.manifest.cbor")).get
+    proc manifestWith(edit: proc(d: var ManifestDoc)): string =
+      var d = honest
+      edit(d)
+      var arts: seq[Artifact]
+      for e in d.entries: arts.add Artifact(name: e.name, kind: e.kind, sha256: e.sha256, size: e.size)
+      encodeManifest(d.package, d.version, arts, d.target, d.otpVersion).get
+    let evil = p.scratch / "evil"
+    removeDir(evil)
+    createDir(evil)
+    let hello = honest.entries.mapIt(it.name).find("demo-hello")
+    check hello >= 0
+    writeFile(evil / "hash.cbor", manifestWith(proc(d: var ManifestDoc) = d.entries[hello].sha256 = repeat('0', 64)))
+    writeFile(evil / "size.cbor", manifestWith(proc(d: var ManifestDoc) = d.entries[hello].size += 1))
+    writeFile(evil / "dots.cbor", manifestWith(proc(d: var ManifestDoc) =
+      d.entries.add ManifestEntry(name: "../escape", kind: akNimChild, sha256: repeat('0', 64), size: 1)))
+    writeFile(evil / "other.cbor", manifestWith(proc(d: var ManifestDoc) = d.package = "other"))
+    writeFile(evil / "ghost.cbor", manifestWith(proc(d: var ManifestDoc) =
+      d.entries.add ManifestEntry(name: "ghost", kind: akBeam, sha256: repeat('0', 64), size: 1)))
+    let ctl = p.scratch / "ctl-k44"
+    removeDir(ctl)
+    createDir(ctl)
+    writeFile(ctl / "run.sh", """#!/bin/sh
+PATH=/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin
+export PATH
+cd /out || exit 90
+cp -R /base honest || exit 91
+cp -R /base m_extra_top;  echo x > m_extra_top/evil.txt
+cp -R /base m_extra_beam; echo x > m_extra_beam/beam/demo/evil.beam
+cp -R /base m_flip;       printf 'x' >> m_flip/demo-hello
+cp -R /base m_link;       rm m_link/demo-hello; ln -s /etc/hostname m_link/demo-hello
+cp -R /base m_dirlink;    rm -rf m_dirlink/beam/demo; ln -s /etc m_dirlink/beam/demo
+cp -R /base m_junk;       echo junk > m_junk/niuv.manifest.cbor
+cp -R /base m_nomanifest; rm m_nomanifest/niuv.manifest.cbor
+cp -R /base m_hash;       cp /evil/hash.cbor m_hash/niuv.manifest.cbor
+cp -R /base m_size;       cp /evil/size.cbor m_size/niuv.manifest.cbor
+cp -R /base m_dots;       cp /evil/dots.cbor m_dots/niuv.manifest.cbor
+cp -R /base m_other;      cp /evil/other.cbor m_other/niuv.manifest.cbor
+cp -R /base m_ghost;      cp /evil/ghost.cbor m_ghost/niuv.manifest.cbor
+exit 0
+""")
+    setFilePermissions(ctl / "run.sh", {fpUserRead, fpUserWrite, fpUserExec, fpGroupRead, fpGroupExec, fpOthersRead, fpOthersExec})
+    let outDir = p.scratch / "out-k44"
+    removeDir(outDir)
+    createDir(outDir)
+    let mounts = @[GuestMount(src: ctl, dst: GuestCtl, readOnly: true), GuestMount(src: p.base, dst: "/base", readOnly: true),
+                   GuestMount(src: evil, dst: "/evil", readOnly: true), GuestMount(src: outDir, dst: GuestOut, readOnly: false)]
+    let settings = GuestSettings(image: need("NIUV_ACC_IMAGE"), signature: need("NIUV_ACC_SIGNATURE"), kernel: need("NIUV_ACC_KERNEL"),
+                                 initrd: need("NIUV_ACC_INITRD"), cpu: DefaultCpu, memoryMb: DefaultMemoryMb)
+    inKiteEnv:
+      let ran = runProcess(need("NIUV_ACC_KITE_DIR") / "kite", kiteArgs(settings, "niuv-k44-" & $getCurrentProcessId(), mounts))
+      check ran.isOk
+      check ran.get.code == 0
+      if ran.get.code != 0: echo ran.get.output
+    let want = k44Want()
+    check verifyBuilderOutput(outDir / "honest", want).isOk
+    for (dir, snippet) in [
+        ("m_extra_top", "evil.txt"), ("m_extra_beam", "evil.beam"), ("m_flip", "the host hashed"),
+        ("m_link", "not a regular file"), ("m_dirlink", "(one is required)"), ("m_junk", ""), ("m_nomanifest", "left no"),
+        ("m_hash", "the host hashed"), ("m_size", "bytes but the manifest says"), ("m_dots", "not a file name"),
+        ("m_other", "the guest built other"), ("m_ghost", "(one is required)")]:
+      let r = verifyBuilderOutput(outDir / dir, want)
+      echo dir, ": ", (if r.isErr: r.error.msg else: "ACCEPTED")
+      check r.isErr
+      if r.isErr: check snippet in r.error.msg
