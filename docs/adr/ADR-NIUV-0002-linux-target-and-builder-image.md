@@ -29,7 +29,7 @@ K1 で、Linux のゲストの中なら musl の Nim 2.2.12 で fukai の子が�
 
 - **NIV-24** 目標は `<cpu>-<os>-<libc>`（例 `aarch64-linux-musl`）の文字列で、niuv は**自分が走っている機械の目標だけ**を作る（クロスコンパイルをしない）。`niuv lock|build --target T` の `T` が自分の目標と違えば断る。`--target` が無いときは自分の目標で、振る舞いはいまのまま。目標は実行時に判定する（CPU は `hostCPU`、OS は `hostOS`、Linux の libc は `/lib/ld-musl-<cpu>.so.1` の有無。コンパイル時の定義に頼らない）。範囲は `aarch64-linux-musl` と、ホストの macOS（arm64）の目標だけ。x86 は KVM の背（ADR-KITE-0006）の後。
 - **NIV-25** ロックは目標ごとに 1 つ。自分の目標を `--target` なしで頼んだ時は `niuv.lock`、`--target T` と書いた時は `niuv.<T>.lock`（NIV-11 の「作業場の全メンバーを覆う 1 つの一貫した組」は、各ファイルの中で守る）。`niuv.<T>.lock` のツールは、その目標の実行ファイルの SHA-256 を持つ（ゲストで `niuv lock --target T` が書く）。パッケージと外の依存の中身のハッシュは目標によらず同じ値になる。ビルドは、頼まれたロックのパッケージ・外の依存が合わなければ NIV-12 で断る。
-- **NIV-26** `niuv.<T>.lock` は `[builder]` を 1 つ持つ: `image = "NAME@sha256:<64 hex>"`（ビルド用の像。タグは受けない）。`NAME` は `/` を含む。ホスト側の `niuv build --target T --in-builder`（NIV-27）は、この digest でなければ像を起こさない。`[builder]` の無い `niuv.<T>.lock` を `--in-builder` で使えば断る。署名ファイルはロックに入れない（署名は pin ではなく、確かめる材料。場所は `--signature` か kite の保存先）。
+- **NIV-26** `niuv.<T>.lock` は `[builder]` を 1 つ持つ: `image = "NAME@sha256:<64 hex>"`（ビルド用の像。タグは受けない）。`NAME` は `/` を含む。ホスト側の `niuv build --target T --in-builder`（NIV-27）は、この digest でなければ像を起こさない。`[builder]` の無い `niuv.<T>.lock` を `--in-builder` で使えば断る。署名ファイルはロックに入れない（署名は pin ではなく、確かめる材料。場所は `--signature` か kite の保存先）。ロックが既に像を pin しているとき、`niuv lock --target T --in-builder --builder X` の `X` が違う像なら断る（誤りの文面に今の digest と `X` を出し、動かすには `--repin-builder` を足す。同じ像、まだロックが無い、は今のまま。2026-10-17、K4-4 の見つけたこと 2 から）。
 
 ホストからの呼び出し
 
@@ -193,7 +193,7 @@ jasagiri が案 B を選んだ（fukai roadmap 0.1 章 121）。niuv が閉包�
 | 同: 目録に `../escape` の名前、別のパッケージ名、無い beam を載せる | `which is not a file name` / `the guest built other 0.1.0, not demo 0.1.0` / `lists the beam 'ghost' but 0 applications … have it` |
 
 - 見つけたこと 1: `--signature` を渡さなくても、kite は一度確かめた署名を自分の保存先（`~/.kite/signatures`）に持つので、像は起動する。これは仕様どおりで、「署名なし」の確かめには、署名を見ていない保存先が要る（テストはそれを作る）。niuv が署名を強制するのではなく、署名の確かめは kite の PIN-08 が受け持つ（NIV-28）。
-- 見つけたこと 2: `lock --in-builder --builder X` は、既にあるロックの別の像を上書きする（NIV-26 の「`[builder]` は pin」は `build` の側の約束。`lock` の `--builder` が pin を決める操作そのもの）。ホストのコマンドラインに、ロックと違う digest を渡して `build` する口は無い。ロックを手で書き換えた場合は (1a)(1b) のとおり、署名の確かめが断る。
+- 見つけたこと 2（直した）: `lock --in-builder --builder X` は、既にあるロックの別の像を黙って上書きしていた。いまは断り、`--repin-builder` を要求する（NIV-26）。ホストのコマンドラインに、ロックと違う digest を渡して `build` する口は無い。ロックを手で書き換えた場合は (1a)(1b) のとおり、署名の確かめが断る。
 - ゲストの出力の書き換えは、像を変えず、ゲストの台本（`/ctl/run.sh`）が `/out` に honest な出力の写しを作って書き換え、ホストの `verifyBuilderOutput` が 12 通りすべてを断った。受け入れた物は 0。
 
 **K4 全体（2026-10-17）。** K4-0（kite の mount と像の取り込み）、K4-1（像）、K4-2（niuv の目標・ロック・目録・ホストの再照合）、K4-3（fukai の実物をゲストで作って試験: agent 32 件、`column_child` 10 件、niuv が作った beam での試験 32 件）、K4-4（断る場合）が揃った。像の再現は約束せず、`[builder]` は `sha256:40ede3aa…`（開発用の鍵で署名）に固定する。残る物: 像の署名の本物の鍵（fukai roadmap 118）、sigstore による上流の確かめ、x86・glibc の目標、Nim の実行ファイルのゲスト間の一致（NIV-30 は beam だけを約束する。beam はホストとゲストで 53 個一致した）。

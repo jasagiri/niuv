@@ -23,6 +23,7 @@ options:
                             machine's own, or another one with --in-builder
   --builder NAME@sha256:D   lock --target: the builder image the target's build runs in
   --in-builder              lock and build --target T in the builder image, in a kite guest without network
+  --repin-builder           lock --in-builder --builder X: move a builder image the lock already pins to X
     --signature FILE, --kernel FILE, --initrd FILE, --cpu N, --memory MB   how the guest is started
     --hex-cache DIR         gleam's Hex copy, handed to the guest read-only
   --in-guest                (set by --in-builder) niuv runs in the builder guest: tools are looked up on
@@ -138,7 +139,7 @@ proc openWorkspace(p: Parsed, m: Mode): NResult[Workspace] {.raises: [].} =
 
 proc cmdLock(args: seq[string]): CliResult {.raises: [].} =
   let p = parseArgs(args, @["--workspace", "--target", "--builder", "--lock-out", "--stage"] & @GuestOptions & @["--external-root"],
-                    ["--in-builder", "--in-guest"])
+                    ["--in-builder", "--in-guest", "--repin-builder"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len > 0: return usageFail("lock takes no arguments")
   let mode = readMode(p.get)
@@ -146,6 +147,8 @@ proc cmdLock(args: seq[string]): CliResult {.raises: [].} =
   let m = mode.get
   let builderGiven = p.get.opts.getOrDefault("--builder")
   if builderGiven.len > 0 and m.target.len == 0: return usageFail("--builder needs --target")
+  let repin = p.get.opts.hasKey("--repin-builder")
+  if repin and not m.inBuilder: return usageFail("--repin-builder is for --in-builder")
   if p.get.opts.hasKey("--lock-out") and m.target.len == 0: return usageFail("--lock-out needs --target")
   let ws = openWorkspace(p.get, m)
   if ws.isErr: return fail($ws.error)
@@ -158,7 +161,7 @@ proc cmdLock(args: seq[string]): CliResult {.raises: [].} =
   let stageGiven = p.get.opts.getOrDefault("--stage")
   if m.inBuilder:
     let r = lockInBuilder(ws.get, m.target, (if builderGiven.len > 0: builderGiven[^1] else: ""),
-                          (if stageGiven.len > 0: stageGiven[^1] else: defaultStageRoot()), m.guest)
+                          (if stageGiven.len > 0: stageGiven[^1] else: defaultStageRoot()), m.guest, repin)
     if r.isErr: return fail($r.error)
     l = r.get
   else:

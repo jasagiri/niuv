@@ -613,3 +613,57 @@ suite "NIV-27 niuv lock --in-builder":
       putEnv("FAKE_KITE_OUT", keepLock)
       check runCli(@["lock", "--workspace", r.ws, "--target", linux, "--in-builder", "--stage", r.dir / "stage"]).code == 0)
     check "--image:" & image in kiteArgsSeen(r)
+
+  # SPEC: NIV-26 (a pinned builder image is moved only on purpose)
+  const otherImage = "niuv/builder@sha256:" & "ab".repeat(32)
+
+  test "Given a lock that pins an image, When locked in the builder with another --builder, Then it is refused naming both digests and the flag, and no guest starts":
+    let r = setUp("ibl-repin-refused")
+    lockHost(r)
+    writeLinuxLock(r)
+    let before = readFile(r.dir / lockFileName(linux))
+    withKite(r, proc () =
+      let res = runCli(@["lock", "--workspace", r.ws, "--target", linux, "--in-builder", "--builder", otherImage,
+                         "--stage", r.dir / "stage"])
+      check res.code != 0
+      check image in res.stderr
+      check otherImage in res.stderr
+      check "--repin-builder" in res.stderr
+      check not fileExists(r.log))
+    check readFile(r.dir / lockFileName(linux)) == before
+
+  test "Given a lock that pins an image, When locked with another --builder and --repin-builder, Then the guest runs on the new image and the lock names it":
+    let r = setUp("ibl-repin-ok")
+    lockHost(r)
+    writeLinuxLock(r)
+    let g = guestLock(r, "repin-lock", proc (l: var Lock) = l.builder = some(LockedBuilder(image: otherImage)))
+    withKite(r, proc () =
+      putEnv("FAKE_KITE_OUT", g)
+      let res = runCli(@["lock", "--workspace", r.ws, "--target", linux, "--in-builder", "--builder", otherImage,
+                         "--repin-builder", "--stage", r.dir / "stage"])
+      check res.code == 0
+      check readLockFile(r.dir / lockFileName(linux)).get.builder.get.image == otherImage)
+    check "--image:" & otherImage in kiteArgsSeen(r)
+
+  test "Given a lock that pins an image, When locked with the same --builder, Then it is accepted without the flag":
+    let r = setUp("ibl-repin-same")
+    lockHost(r)
+    writeLinuxLock(r)
+    let g = guestLock(r, "same-lock")
+    withKite(r, proc () =
+      putEnv("FAKE_KITE_OUT", g)
+      check runCli(@["lock", "--workspace", r.ws, "--target", linux, "--in-builder", "--builder", image,
+                     "--stage", r.dir / "stage"]).code == 0)
+
+  test "Given no lock yet, When --repin-builder is given, Then it is accepted (there is nothing to move)":
+    let r = setUp("ibl-repin-first")
+    lockHost(r)
+    let g = guestLock(r, "first-lock")
+    withKite(r, proc () =
+      putEnv("FAKE_KITE_OUT", g)
+      check runCli(@["lock", "--workspace", r.ws, "--target", linux, "--in-builder", "--builder", image,
+                     "--repin-builder", "--stage", r.dir / "stage"]).code == 0)
+
+  test "Given --repin-builder without --in-builder, When run, Then it is a usage error":
+    let r = setUp("ibl-repin-usage")
+    check runCli(@["lock", "--workspace", r.ws, "--target", linux, "--repin-builder"]).code != 0

@@ -369,17 +369,22 @@ proc buildInBuilder*(ws: Workspace, package, namedTarget, outDir, stageRoot: str
                                           bins: bins, pinnedOtp: if pinned.len > 0: pinned[0].version else: ""))
 
 proc lockInBuilder*(ws: Workspace, namedTarget, builderImage, stageRoot: string,
-                    o: BuilderOptions): NResult[Lock] {.raises: [].} =
+                    o: BuilderOptions, repin = false): NResult[Lock] {.raises: [].} =
   ## `niuv lock --target T --in-builder`: the guest locks the Linux tools; the
   ## host recomputes every package and external hash itself and takes the
   ## builder image from its own side, so the guest decides neither.
   let linuxT = ?linuxTarget(namedTarget)
   var image = builderImage
-  if image.len == 0:
-    let existing = lockPath(ws, namedTarget)
-    if fileExists(existing):
-      let l = ?readLock(ws, namedTarget)
-      if l.builder.isSome: image = l.builder.get.image
+  let existing = lockPath(ws, namedTarget)
+  if fileExists(existing):
+    let l = ?readLock(ws, namedTarget)
+    if l.builder.isSome:
+      let pinned = l.builder.get.image
+      if image.len == 0: image = pinned
+      elif image != pinned and not repin:
+        # NIV-26: the pin is moved on purpose, not by a --builder that happens to differ.
+        return err(niuvError(ekLock, lockFileName(namedTarget) & " pins the builder image " & pinned &
+                                     "; --builder asks for " & image & ". Add --repin-builder to move the pin."))
   if image.len == 0:
     return err(niuvError(ekUsage, "the builder image is not known: give --builder NAME@sha256:<digest>"))
   discard ?checkBuilderImage(image)
