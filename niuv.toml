@@ -18,8 +18,9 @@ flags = ["-d:release", "--hints:off"]
 workspace = ["nim-cbor-det", "nim-frames"]
 
 [dependencies.external.parsetoml]
-source = "github.com/NimParsers/parsetoml"
+source = "github.com/NimParsers/parsetoml.git"
 version = "0.7.2"
+src = "src"
 license = "MIT"
 
 [dependencies.external.results]
@@ -30,4 +31,5 @@ license = "MIT"
 [dependencies.external.checksums]
 source = "github.com/nim-lang/checksums"
 version = "0.2.1"
+src = "src"
 license = "MIT"
