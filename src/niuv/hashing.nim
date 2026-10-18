@@ -36,18 +36,29 @@ proc sha256File*(path: string): NResult[string] {.raises: [].} =
   close(f)
   ok(ctx.digest().toHex)
 
-proc listFiles*(dir: string, skipDirs: openArray[string] = []): NResult[seq[string]] {.raises: [].} =
+proc listFiles*(dir: string, skipDirs: openArray[string] = [],
+                 skipPaths: openArray[string] = []): NResult[seq[string]] {.raises: [].} =
   ## Every file under `dir` as a '/'-separated path relative to it, sorted.
-  ## The directories named in `skipDirs` are left out at any depth. A symlink
-  ## to a directory is an error: what it points at could change unseen.
+  ## The directories named in `skipDirs` are left out at any depth; the
+  ## absolute paths in `skipPaths` (a directory or a file) are left out where
+  ## they are (NIV-33). A symlink to a directory is an error: what it points
+  ## at could change unseen.
   if not dirExists(dir):
     return err(niuvError(ekIo, dir & ": not a directory"))
   let skip = @skipDirs
+  var skipAbs: seq[string]
+  var absDir: string
+  try:
+    absDir = normalizedPath(absolutePath(dir))
+    for p in skipPaths: skipAbs.add normalizedPath(absolutePath(p))
+  except CatchableError as e:
+    return err(niuvError(ekIo, dir & ": " & e.msg))
   var files: seq[string]
   proc walk(rel: string): NResult[void] {.raises: [].} =
     try:
       for kind, path in walkDir(dir / rel, relative = true):
         let relPath = if rel.len == 0: path else: rel / path
+        if skipAbs.len > 0 and (absDir / relPath) in skipAbs: continue
         case kind
         of pcDir:
           if path notin skip: ?walk(relPath)
@@ -72,9 +83,10 @@ proc hashEntries*(entries: openArray[tuple[label, path: string]]): NResult[strin
   lines.sort()
   ok(sha256Hex(lines.join("")))
 
-proc treeHash*(dir: string, skipDirs: openArray[string] = []): NResult[string] {.raises: [].} =
+proc treeHash*(dir: string, skipDirs: openArray[string] = [],
+                skipPaths: openArray[string] = []): NResult[string] {.raises: [].} =
   ## `hashEntries` over every file of `dir`, labelled by its relative path.
   var entries: seq[tuple[label, path: string]]
-  for rel in ?listFiles(dir, skipDirs):
+  for rel in ?listFiles(dir, skipDirs, skipPaths):
     entries.add (label: rel, path: dir / rel)
   hashEntries(entries)

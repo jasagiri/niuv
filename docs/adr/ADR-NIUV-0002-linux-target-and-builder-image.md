@@ -46,6 +46,10 @@ K1 で、Linux のゲストの中なら musl の Nim 2.2.12 で fukai の子が�
 
 - **NIV-32** 像の作り方は `builder/` に、(a) 入力の表（Alpine の index の digest、OTP・Nim・gleam の取得元の URL と SHA-256、niuv の木の中身のハッシュ）、(b) Dockerfile、(c) 作った像を OCI のレイアウトで書き出す手順、(d) 作った像に入っている物の記録（`apk info -v`、各ツールの版と実行ファイルの SHA-256、`erl` の OTP_VERSION）、から成る。(a) の SHA-256 が合わない取得は、作業を止める。署名は `builder/` の外（`kite_sign`、鍵は niuv が持たない）。署名した像の digest が `niuv.<T>.lock` の `[builder]` に入る。
 
+作業場とパッケージの境（K5-1c、fukai roadmap 0.1 章 127 (1)）
+
+- **NIV-33** 作業場のディレクトリ（`niuv.workspace.toml` のあるディレクトリ。宣言 `decls/` とロックを置く所）は、パッケージの一部ではない。パッケージの中身のハッシュ（NIV-11。ロックの `sha256`）と Gleam のステージの名前（NIV-16）は、作業場のディレクトリがパッケージの根（や Nim の `src`・bin の main のあるディレクトリ）の中にあれば、その下を数えない。作業場のディレクトリが数える木そのものなら、`niuv.workspace.toml` と `niuv*.lock` だけを数えない。宣言 `niuv.toml` は NIV-11 のとおり別に数える。理由: 作業場がパッケージの根の中にあると、ロックを書くたびにパッケージのハッシュが変わり、`niuv build` が NIV-12 の「changed since it was locked」で必ず断った（島のノードの像、`island_node` の根の中の `image/`）。採らなかった案: 使い手の側で作業場を根の外へ出す（置き場の制約を使い手に押し付け、niuv が自分の書くファイルでハッシュを狂わす欠陥が残る）。
+
 ## 選択肢と比較
 
 ### 1. 像の運び方（OCI の形にして kite に渡す）

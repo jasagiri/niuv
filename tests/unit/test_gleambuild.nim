@@ -86,7 +86,7 @@ proc makeHexPackage(d, name, version: string, extra: openArray[(string, string)]
 
 proc build(d: string, ws: Workspace, stageRoot: string): NResult[GleamResult] =
   let c = resolveClosure(ws, "app").get
-  buildGleam(realGleam(), realErlang(), c, d / "out", stageRoot, d / "hexcache")
+  buildGleam(realGleam(), realErlang(), ws, c, d / "out", stageRoot, d / "hexcache")
 
 proc beamHashes(r: GleamResult): seq[string] =
   r.artifacts.mapIt(it.name & " " & it.sha256).sorted
@@ -270,9 +270,28 @@ suite "NIV-16 gleam plumbing":
     var c = resolveClosure(ws, "app").get
     for p in c.packages.mitems:
       if p.name == "app": p.gleam.present = false
-    let r = buildGleam(realGleam(), realErlang(), c, d / "out", d / "stage")
+    let r = buildGleam(realGleam(), realErlang(), ws, c, d / "out", d / "stage")
     check r.isErr
     check r.error.kind == ekUsage
+
+  test "Given a workspace inside the package root, When a file of the workspace directory changes, Then the stage is the same one (NIV-33)":
+    let d = freshDir("gl-wsdir")
+    writeTree(d, {
+      "pkg/ws/decls/app/niuv.toml": pkgToml("app", "root = \"../../..\"\n\n[gleam]\n"),
+      "pkg/ws/niuv.workspace.toml": "[workspace]\nmembers = [\"decls/app\"]\n",
+      "pkg/gleam.toml": "name = \"app\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\nlicences = [\"Apache-2.0\"]\n",
+      "pkg/src/app.gleam": "pub fn one() -> Int {\n  1\n}\n"})
+    let ws = loadWorkspace(d / "pkg" / "ws" / "niuv.workspace.toml").get
+    let c = resolveClosure(ws, "app").get
+    let first = buildGleam(realGleam(), realErlang(), ws, c, d / "out1", d / "stage")
+    writeTree(d, {"pkg/ws/niuv.aarch64-linux-musl.lock": "written after the first build\n"})
+    let second = buildGleam(realGleam(), realErlang(), ws, c, d / "out2", d / "stage")
+    check first.isOk and second.isOk
+    check first.get.stageDir == second.get.stageDir
+    writeTree(d, {"pkg/src/app.gleam": "pub fn one() -> Int {\n  2\n}\n"})
+    let third = buildGleam(realGleam(), realErlang(), ws, c, d / "out3", d / "stage")
+    check third.isOk
+    check third.get.stageDir != first.get.stageDir
 
 suite "NIV-17 fixed bytes":
   test "Given one input built in two places with two stage roots, When the beams are hashed, Then all are equal":

@@ -377,3 +377,67 @@ suite "NIV-26 builder image":
   test "Given a builder table with another key, When parsed, Then it is refused":
     let text = "lock-version = 1\n[builder]\nimage = \"" & image & "\"\nsignature = \"x\"\n"
     check parseLock(text, "x.lock").isErr
+
+# ---- the workspace directory is not part of a package --------------------
+
+suite "NIV-33 the workspace directory is not part of a package":
+  proc nestedWorkspace(dir: string): Workspace =
+    ## `pkg` is a Gleam package whose root holds the workspace directory `pkg/ws`
+    ## (the declaration sits in `ws/decls/app` and points at the root).
+    writeTree(dir, {
+      "pkg/ws/decls/app/niuv.toml": pkgToml("app", "root = \"../../..\"\n\n[gleam]\n"),
+      "pkg/ws/niuv.workspace.toml": "[workspace]\nmembers = [\"decls/app\"]\n",
+      "pkg/gleam.toml": "name = \"app\"\nversion = \"0.1.0\"\n",
+      "pkg/src/app.gleam": "pub fn one() { 1 }\n"})
+    loadWorkspace(dir / "pkg" / "ws" / "niuv.workspace.toml").get
+
+  proc packageSha(ws: Workspace): string =
+    buildLock(ws, @[nimTool]).get.packages[0].sha256
+
+  test "Given a workspace inside the package root, When the lock is written there, Then the package hash and the check do not move":
+    let d = freshDir("niv33-lock")
+    let ws = nestedWorkspace(d)
+    let l = buildLock(ws, @[nimTool]).get
+    check writeLock(ws, l, "aarch64-linux-musl").isOk
+    check writeLock(ws, l).isOk
+    check packageSha(ws) == l.packages[0].sha256
+    check checkLock(l, ws, resolveClosure(ws, "app").get, "aarch64-linux-musl").isOk
+
+  test "Given a workspace inside the package root, When a file of the workspace directory changes, Then the package hash does not":
+    let d = freshDir("niv33-ws-file")
+    let ws = nestedWorkspace(d)
+    let before = packageSha(ws)
+    writeTree(d, {"pkg/ws/notes/readme.txt": "one"})
+    check packageSha(ws) == before
+    writeTree(d, {"pkg/ws/notes/readme.txt": "two", "pkg/ws/decls/other/niuv.toml": "[package]"})
+    check packageSha(ws) == before
+
+  test "Given a workspace inside the package root, When a source outside it changes, Then the package hash changes":
+    let d = freshDir("niv33-src")
+    let ws = nestedWorkspace(d)
+    let before = packageSha(ws)
+    writeTree(d, {"pkg/src/app.gleam": "pub fn one() { 2 }\n"})
+    check packageSha(ws) != before
+
+  test "Given a workspace inside the package root, When the declaration changes, Then the package hash changes":
+    let d = freshDir("niv33-decl")
+    let ws = nestedWorkspace(d)
+    let before = packageSha(ws)
+    let f = d / "pkg" / "ws" / "decls" / "app" / "niuv.toml"
+    writeFile(f, readFile(f) & "\n# changed\n")
+    check packageSha(loadWorkspace(d / "pkg" / "ws" / "niuv.workspace.toml").get) != before
+
+  test "Given a workspace directory that is the package root, When a lock is written, Then only the lock and the workspace file stay out of the hash":
+    let d = freshDir("niv33-root")
+    writeTree(d, {
+      "niuv.toml": pkgToml("app", "\n[gleam]\n"),
+      "niuv.workspace.toml": "[workspace]\nmembers = [\".\"]\n",
+      "gleam.toml": "name = \"app\"\nversion = \"0.1.0\"\n",
+      "src/app.gleam": "pub fn one() { 1 }\n"})
+    let ws = loadWorkspace(d / "niuv.workspace.toml").get
+    let l = buildLock(ws, @[nimTool]).get
+    check writeLock(ws, l, "aarch64-linux-musl").isOk
+    check writeLock(ws, l).isOk
+    check packageSha(ws) == l.packages[0].sha256
+    writeTree(d, {"src/app.gleam": "pub fn one() { 2 }\n"})
+    check packageSha(ws) != l.packages[0].sha256

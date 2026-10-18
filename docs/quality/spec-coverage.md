@@ -43,6 +43,7 @@
 | NIV-30 | （K4-4 で測る。この段では実装しない） | 未実装 |
 | NIV-31 | tests/unit/test_inbuilder.nim: `NIV-27 what the guest gets`（`--net` を渡さない・Hex の写しは ro で /hex・ゲストの命令）、`NIV-27 niuv build --in-builder`（Hex の写しが無ければ断る）。ゲストの offline の gleam は受け入れ | 一部あり（K4-2） |
 | NIV-32 | builder/test/test_verify.sh（入力の SHA-256 が合わなければ止まる）。像の中身の記録（d）は `builder/records/` の実測で、`builder/selftest.sh` をゲストで流した結果が E | 一部あり（K4-1）。`test_all` の外で `sh builder/test/test_verify.sh` を手で流す |
+| NIV-33 | tests/unit/test_lock.nim: `NIV-33 the workspace directory is not part of a package`（ロックを書いてもハッシュとチェックが動かない・作業場の下のファイルが動かさない・根の外の源と宣言は動かす・作業場が根そのものの場合）、tests/unit/test_gleambuild.nim: ステージの名前が作業場の下のファイルで動かない | あり（K5-1c） |
 
 ## 注
 

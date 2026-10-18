@@ -82,7 +82,7 @@ proc buildPackage*(ws: Workspace, package: string, outDir: string, stageRoot: st
   if buildsNim:
     outcome.artifacts.add ?buildNim(tool("nim"), closure, outDir, stageRoot, only)
   if buildsGleam:
-    let g = ?buildGleam(tool("gleam"), tool("erlang"), closure, outDir, stageRoot)
+    let g = ?buildGleam(tool("gleam"), tool("erlang"), ws, closure, outDir, stageRoot)
     ?checkLicenses(g.hex, root.gleam.sealed, package)
     outcome.artifacts.add g.artifacts
     for c in gleamComponents(closure, g.hex):

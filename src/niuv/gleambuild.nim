@@ -16,7 +16,7 @@
 
 import std/[algorithm, os, sequtils, strutils, tables]
 import parsetoml
-import ./[artifact, decl, errors, exec, hashing, resolve, sbom, toolchain]
+import ./[artifact, decl, errors, exec, hashing, lock, resolve, sbom, toolchain, workspace]
 
 const
   MaxGleamOutput = 8192
@@ -216,12 +216,12 @@ proc unpackHex(h: HexPackage, cache, to: string): NResult[void] {.raises: [].} =
 proc tail(s: string, n: int): string {.raises: [].} =
   if s.len <= n: s else: "..." & s[s.len - n .. ^1]
 
-proc stageKey(pkgs: seq[GleamPackage], hex: seq[HexPackage], gleam, erlang: ToolInfo): NResult[string] {.raises: [].} =
-  ## The stage is named for its input: the tools, every package's content and
-  ## the Hex archives' checksums.
+proc stageKey(pkgs: seq[GleamPackage], hex: seq[HexPackage], gleam, erlang: ToolInfo, ws: Workspace): NResult[string] {.raises: [].} =
+  ## The stage is named for its input: the tools, every package's content (the
+  ## workspace directory is not part of it, NIV-33) and the Hex archives' checksums.
   var lines = @["gleam " & gleam.version & " " & gleam.sha256, "erlang " & erlang.version & " " & erlang.sha256]
   for p in pkgs.sortedByIt(it.name):
-    lines.add p.name & "\0" & ?treeHash(p.dir, [".git", ".jj", "build"])
+    lines.add p.name & "\0" & ?treeHash(p.dir, [".git", ".jj", "build"], ?workspaceSkips(ws, p.dir))
   for h in hex:
     lines.add "hex " & h.name & " " & h.version & " " & h.checksum
   ok(sha256Hex(lines.join("\n")))
@@ -247,7 +247,7 @@ proc order(units: seq[Unit], root: string): NResult[seq[Unit]] {.raises: [].} =
   ?visit(root)
   ok(res)
 
-proc buildGleam*(gleam, erlang: ToolInfo, c: Closure, outDir, stageRoot: string,
+proc buildGleam*(gleam, erlang: ToolInfo, ws: Workspace, c: Closure, outDir, stageRoot: string,
                  hexCache = ""): NResult[GleamResult] {.raises: [].} =
   ## Compiles the Gleam packages of the closure (and the Hex packages the root's
   ## `manifest.toml` pins for them) under `stageRoot/<input hash>/` and copies
@@ -269,7 +269,7 @@ proc buildGleam*(gleam, erlang: ToolInfo, c: Closure, outDir, stageRoot: string,
     stageBase = absolutePath(stageRoot)
   except CatchableError as e:
     return err(niuvError(ekIo, stageRoot & ": " & e.msg))
-  let stage = stageBase / ?stageKey(pkgs, hexPkgs, gleam, erlang)
+  let stage = stageBase / ?stageKey(pkgs, hexPkgs, gleam, erlang, ws)
   var res = GleamResult(stageDir: stage)
   try:
     removeDir(stage)

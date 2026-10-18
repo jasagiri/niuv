@@ -44,16 +44,37 @@ proc lockErr[T](msg: string): NResult[T] {.raises: [].} =
 
 # ---------------------------------------------------------------- hashing
 
-proc packageHash*(d: PackageDecl): NResult[string] {.raises: [].} =
+proc workspaceSkips*(ws: Workspace, treeDir: string): NResult[seq[string]] {.raises: [].} =
+  ## What of the workspace sits inside `treeDir` and is not the package's
+  ## (NIV-33): the workspace directory, whole, when `treeDir` is a proper
+  ## ancestor of it; when it is `treeDir` itself, only the workspace file and
+  ## the lock files, which niuv writes.
+  var skips: seq[string]
+  try:
+    let tree = normalizedPath(absolutePath(treeDir))
+    if ws.dir == tree:
+      skips.add ws.file
+      for kind, path in walkDir(ws.dir):
+        let name = extractFilename(path)
+        if kind == pcFile and name.endsWith(".lock") and (name == LockFileName or name.startsWith("niuv.")):
+          skips.add path
+    elif ws.dir.startsWith(tree & "/"):
+      skips.add ws.dir
+  except CatchableError as e:
+    return err(niuvError(ekIo, ws.dir & ": " & e.msg))
+  ok(skips)
+
+proc packageHash*(d: PackageDecl, ws: Workspace): NResult[string] {.raises: [].} =
   ## The declared sources of a package: the declaration, the Nim src
   ## directory, the directory of each bin's main (or the main alone when it
   ## sits in the root), the Gleam root without its build output, the WASM
-  ## entry. Files outside these (tests, docs, bin/) do not move the hash.
+  ## entry. Files outside these (tests, docs, bin/) do not move the hash, and
+  ## neither does the workspace (NIV-33).
   var entries: seq[tuple[label, path: string]]
   proc add(label, path: string) {.raises: [].} =
     if entries.allIt(it.label != label): entries.add (label: label, path: path)
   proc addTree(dir, labelPrefix: string): NResult[void] {.raises: [].} =
-    for rel in ?listFiles(dir, SkipDirs):
+    for rel in ?listFiles(dir, SkipDirs, ?workspaceSkips(ws, dir)):
       add(labelPrefix & rel, dir / rel)
     ok()
   add("decl/niuv.toml", d.declDir / "niuv.toml")
@@ -76,7 +97,7 @@ proc lockPackage*(ws: Workspace, d: PackageDecl): NResult[LockedPackage] {.raise
     rel = relativePath(d.root, ws.dir)
   except CatchableError as e:
     return lockErr[LockedPackage]("package '" & d.name & "': " & e.msg)
-  ok(LockedPackage(name: d.name, version: d.version, path: rel, sha256: ?packageHash(d)))
+  ok(LockedPackage(name: d.name, version: d.version, path: rel, sha256: ?packageHash(d, ws)))
 
 proc lockExternal*(e: ResolvedExternal): NResult[LockedExternal] {.raises: [].} =
   ok(LockedExternal(name: e.name, source: e.source, version: e.version,
