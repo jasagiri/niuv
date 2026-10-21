@@ -17,6 +17,8 @@ it holds no key and knows nothing about fukai.
 | `import-sign.sh` | `kite import` of the OCI layout, then `kite_sign image` |
 | `run-selftest.sh`, `selftest.sh` | Start the image in a kite guest with `--mount` (source read-only, output read-write) and `--exit-status`; `selftest.sh` is the guest's program |
 | `builder-run` | The image's program for `niuv ... --in-builder`: runs `/ctl/run.sh`, which the host writes into a read-only mount (kite starts a program that is in the image, not in a mount) |
+| `derive.sh` | The next image from the one before it, without podman: unpack the base's root, replace `niuv`, `builder-run` and `/etc/hosts`, `kite pack` twice (same digest required), import, check the image against the tree, sign |
+| `tools/imagetree.nim`, `tools/build.sh` | `list` (a root as comparable lines) and `unpack` (a stored image's root, built by kite's own reader); built against the kite source tree |
 | `records/` | What went in: `apk-info.txt`, `tools.txt`, `exe-sha256.txt`, `selftest.txt`, `build-record.md` |
 | `test/test_verify.sh` | E tests of the input check (`sh builder/test/test_verify.sh`) |
 | `LICENSES.md` | The licenses of what the image contains |
@@ -35,6 +37,28 @@ builder/run-selftest.sh --home KITE_HOME --image niuv/builder@sha256:… \
 
 `--home` is the `HOME` kite runs with (its store is `~/.kite`, its trust file
 `~/.config/kite/trust.json`). The name given to `kite_sign` must contain a `/`.
+
+## Deriving the next image
+
+`Containerfile` and `build.sh` make the first image: Alpine, Nim, OTP and gleam
+cannot come from anywhere else. What changes afterwards (niuv, the entry
+`builder-run`, `/etc/hosts`) changes by derivation, because it is three files
+and the rest must stay byte for byte (ADR-NIUV-0002, "K5 の続き"):
+
+```sh
+tools/build.sh KITE_SRC OUT/tools                 # imagetree, against kite-container
+derive.sh --home KITE_HOME --base niuv/builder-k4@sha256:… --niuv NIUV_FOR_LINUX \
+  --out OUT/derive --repo niuv/builder --kite KITE --kite-sign KITE_SIGN \
+  --key KEYFILE --imagetree OUT/tools/imagetree   # about 17 minutes (two packs of 400 MB)
+```
+
+`NIUV_FOR_LINUX` is a niuv built for `aarch64-linux-musl`: `niuv build niuv
+--target aarch64-linux-musl --in-builder` in a workspace that lists niuv,
+nim-cbor-det, nim-frames and nim-fdio. The script stops on any difference
+outside the three files, on two packs with different digests, and on an image
+that differs from its tree. An image made this way is not what `Containerfile`
+would make (the `/etc/hosts` line is only added here); the records say which
+one an image is.
 
 ## The signing key is a development key
 

@@ -5,4 +5,9 @@
 # the host writes /ctl/run.sh (the one niuv command, in the host's own quoting)
 # into a directory it mounts read-only, and this runs it. Its exit status is the
 # guest's (kite --exit-status).
+#
+# The guest's host name is "(none)" until it is set, and resolving "(none)"
+# waits five seconds (ADR-IND-0001, K5-1a). The name is paired with the line
+# of /etc/hosts that derive.sh puts in the image; the two change together.
+hostname niuv-builder || { echo "builder-run: cannot set the host name" >&2; exit 2; }
 exec /bin/sh /ctl/run.sh

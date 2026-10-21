@@ -1,5 +1,8 @@
 # The builder image (ADR-NIUV-0002, NIV-32 b): musl Nim, OTP, gleam and niuv on
-# Alpine, aarch64 only. Built by build.sh, which stages the context.
+# Alpine, aarch64 only. Built by build.sh, which stages the context. This makes
+# the FIRST image; later ones are derived from it by derive.sh (niuv, builder-run
+# and /etc/hosts replaced, nothing else), so this file does not describe the
+# current image.
 # Every upstream tarball is checked against inputs.sha256 here as well as
 # on the host: the check is the first thing a build does, before any long step.
 ARG ALPINE_REF

@@ -202,6 +202,36 @@ jasagiri が案 B を選んだ（fukai roadmap 0.1 章 121）。niuv が閉包�
 
 **K4 全体（2026-10-17）。** K4-0（kite の mount と像の取り込み）、K4-1（像）、K4-2（niuv の目標・ロック・目録・ホストの再照合）、K4-3（fukai の実物をゲストで作って試験: agent 32 件、`column_child` 10 件、niuv が作った beam での試験 32 件）、K4-4（断る場合）が揃った。像の再現は約束せず、`[builder]` は `sha256:40ede3aa…`（開発用の鍵で署名）に固定する。残る物: 像の署名の本物の鍵（fukai roadmap 118）、sigstore による上流の確かめ、x86・glibc の目標、Nim の実行ファイルのゲスト間の一致（NIV-30 は beam だけを約束する。beam はホストとゲストで 53 個一致した）。
 
+## K5 の続き（2026-10-21）: ビルド用の像を `kite pack` で派生させる（fukai roadmap 0.1 章 128）
+
+K4-3 の像 `sha256:40ede3aa…` の中の niuv は NIV-33 の前の物で、ゲストとホストが作業場を指紋に入れるかどうかで食い違い、`services/island-node/image/` にロックをコミットできなかった（K5-1c）。また、ゲストのホスト名が `(none)` のとき、名前の解決に 5 秒かかる。像を podman で作り直さず、今の像の木の 3 つのファイルを差し替えて、`kite pack`（ADR-KITE-0011）で 1 層の像にした。
+
+### `Containerfile` をどうするか（選択肢と比較）
+
+- 要件: 差し替えるのは niuv・入口・`/etc/hosts` の 3 つで、ほかは 1 バイトも変えない。podman を使わない（128）。
+- (A) `Containerfile` を正のまま、変えるたびに全部を作り直す。niuv の 1 行の変更でも 400 秒かかり、作るたびに全層の digest が変わる。「ほかは変わっていない」を保てない。
+- (B) 派生の道だけにして `Containerfile` を消す。Alpine・Nim・OTP・gleam の最初の像は、派生では作れない（土台が無い）。
+- (C) `Containerfile` は「最初の像を作る道」として残し、以後は派生する。変わる物（niuv・入口・hosts）だけが差し替えで変わり、ほかは前の像の木そのもの。
+- (C) の代償: 今の像を `Containerfile` が再現しない（`/etc/hosts` の行は派生だけが足し、`kite pack` は像の環境変数・コマンドの設定も書かない）。ただし K4-1 から像の再現は約束していない。
+- 結論: (C)。`builder/Containerfile` の先頭、`builder/README.md`、`builder/records/build-record.md` に、どの像がどちらの道かを書いた。
+
+### 手順と結果
+
+- **新しい niuv**: 今の像のゲストで `niuv build niuv --target aarch64-linux-musl --in-builder` が通った（niuv `591200c8` の木）。niuv が自分自身をゲストで組めた。ELF（aarch64、musl の動的リンク）1,073,152 バイト、SHA-256 `bca4ca6e…`。通すために niuv の宣言を 2 点直した（`dfa42652`）。parsetoml の source を `…/parsetoml.git` に（nimble の cache は `parsetomlgit` と名付ける）、parsetoml と checksums に `src = "src"` を（無いと `cannot open file: checksums/sha2`）。niuv が自分を組む道は、この宣言の誤りで一度も通っていなかった。
+- **`builder/derive.sh`**: 土台の像の木を kite の読み手で取り出し（`tools/imagetree.nim unpack`）、3 つを差し替え、差が 3 行だけであることを確かめ、`kite pack` を 2 回（同じ digest を要求）、`kite import`、取り込んだ像を取り出して木と照らし、署名する。
+- **新しい像** `niuv/builder@sha256:1d1da016041cb2d144308049b9b965e5a5baa31214c31e358e829b1e112a74f6`（開発用の鍵で署名。層 1 枚、展開後 6234 エントリ）。同じ木からの 2 回の pack で digest が一致し、`derive.sh` を 2 回（kite の zippy が違う 2 つの版）流しても同じ digest だった。土台の木との差は `/usr/local/bin/niuv`・`/usr/local/bin/builder-run`・`/etc/hosts` の 3 行だけ。SHA-256 は `builder/records/replaced-sha256.txt`。
+- **途中で見つけた kite の欠陥**: zippy 0.10.18 の inflate が arm64 の macOS で、展開後が約 256 MiB を超える層を読み違え（`Checksum verification failed`）、この像の層（407 MB）を kite 自身が展開できなかった。kite-container `8d9ac045` が zippy を 0.10.20 に上げて直した。`kite pack` の digest は変わらない。
+- **入口とホスト名**: `builder-run` が先頭で `hostname niuv-builder` を呼び、像の `/etc/hosts` の 127.0.0.1 の行に同じ名前を足した（対。島の像の入口と同じ手当て）。`inet:gethostbyname` の時間は、土台の像で 5014 ms（名前 `(none)`）、新しい像で 2 ms。
+- **K4 の受け入れの試験**（`tests/acceptance/test_builder_guest.nim`）は新しい像で 5 件通った。`tests/test_all.nim` は 319 件・失敗 0・警告 0。
+- **island-node**: `image/` を作業場にして、`niuv lock --in-builder`（40 パッケージ、外の依存 6）、`niuv build island-node`、`niuv build island-boot` が、`image/` を除いた複製なしで通り、ホストの再照合も通った。ロックは island-node にコミットした（`ab677c51`）。ロックがまだ無かったので `--repin-builder` は要らなかった（NIV-26 が要るのは、別の像を pin しているロックだけ）。
+- **ゲストの起動**: `kite pack` は owner・時刻・hard link・拡張属性を書かず、像の設定（環境変数・コマンド）も空にする。ゲストはこの像で起動し、受け入れの試験が通った。環境変数に頼る道が出たら、像の側で足す。
+
+### 残るもの
+
+- 像の署名は開発用の鍵のまま（fukai roadmap 118）。
+- `tools/imagetree.nim` の `list` は、island-node の `image/tools/imagetree.nim` とほぼ同じ物。kite が木を並べる口を持てば一本にできる（Future:）。
+- 派生の鎖が長くなる。最初の像から作り直すときは `build.sh` から始め、`derive.sh` の差し替えを順に当てる。
+
 ## 決めてほしい点
 
 （2026-10-17、jasagiri が 1〜9 を推奨どおり承認。以下は承認された案の理由として残す。）

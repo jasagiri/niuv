@@ -97,3 +97,44 @@ The same recipe, with niuv at jj `6919be9b66be` (`feat(gleam): compile each pack
 | Signed by | the development key `niuv-builder-dev-k4`, as before |
 
 `exe-sha256.txt` is of this image (only the `niuv` line differs from K4-2's); `apk-info.txt` and `tools.txt` are unchanged. The K4-2 image (`sha256:0f5f221a…`) builds Gleam packages that have a `path` dependency only with the network, so `--in-builder` should use this one. An earlier build of the same commit minus the `tar` fix had digest `sha256:c2f816cb…`; it cannot unpack a Hex archive in the guest (busybox) and is not to be used.
+
+## The image of K5 (2026-10-21): derived from the K4-3 image with `kite pack`, no podman
+
+The K4-3 image had niuv from before NIV-33 (the guest and the host disagreed on
+a package's fingerprint when the workspace was inside the package root) and no
+host name (a guest's name is `(none)`, and `inet:gethostbyname` of it waited
+five seconds). It is not rebuilt: `derive.sh` unpacks its root with kite's own
+reader, replaces three files and packs the tree (ADR-NIUV-0002, "K5 の続き").
+
+| | |
+|---|---|
+| Base | `niuv/builder-k4@sha256:40ede3aa423d3c065451d96cf9c1e32467b5549073ff7c3c6106a30d2aaf5107` (the K4-3 image above) |
+| Manifest digest (what `[builder]` pins from now on) | `sha256:1d1da016041cb2d144308049b9b965e5a5baa31214c31e358e829b1e112a74f6` |
+| Config digest | `sha256:ca3387ff8755e0c3653811dd713ed93cbe1286f36f25c0588156f8173dee8277` (151 bytes: `kite pack` writes no environment or command) |
+| Name given to kite and to `kite_sign` | `niuv/builder` |
+| Layers | 1, `application/vnd.oci.image.layer.v1.tar+gzip`: `sha256:07f4090267a18a314e5b410c9d65f6667bfdf1619c5dff229d9c1b4b2f96f2cb`, 173,831,591 bytes (6234 entries, 407,197,184 bytes of tar) |
+| Made with | kite 0.2.0 from kite-container `8d9ac045` (zippy 0.10.20; with 0.10.18 the layer could not be read back, kite-container's own fix), niuv's `derive.sh` |
+| Reproduced | the same tree packed twice gave the same manifest digest, in each of two runs of `derive.sh` (two kite builds: zippy 0.10.18 and 0.10.20); the layer read back by kite's own reader lists the same 6234 entries as the tree |
+| Signed by | the development key `niuv-builder-dev-k4`, as before (fukai roadmap 118 does not exist yet) |
+
+What was replaced (`replaced-sha256.txt`; `exe-sha256.txt` has the new niuv line):
+
+```
+bca4ca6ebc2babd66bc94c9b3a0132f8119058a693d856a7f24d30ecb4812e99  usr/local/bin/niuv        (was 60c7477b…)
+c2eefa37e084f1644e83b0cd9efef9b94cb51dcd1879a2e1d6e51a78a512fbee  usr/local/bin/builder-run (was 576add80…)
+19a8625aac2b613a3e81670adb021fc05766228600c717a7a6c2e4d4b4355b9c  etc/hosts                 (was e3998dbe…)
+```
+
+Everything else is the base's: listing both roots as `kind mode size sha256 path`
+(`tools/imagetree.nim`) differs in these three lines and nowhere else among 6234
+entries. What the listing does not carry is not in the image either (`kite pack`
+writes no owner, time, hard link or extended attribute: PCK-07, PCK-08; the
+sticky bit of `/tmp` was already dropped by kite's reader when the base was
+unpacked, PCK-05). The new niuv is the one niuv built for `aarch64-linux-musl` in
+the K4-3 image's guest from niuv `591200c8` plus the declaration fix of its
+external dependencies (parsetoml's source spelled `….git`, `src = "src"` for
+parsetoml and checksums), 1,073,152 bytes.
+
+Checked: the K4 acceptance suite (5 tests) on this image; `inet:gethostbyname` of
+the guest's own name: `(none)` 5014 ms in the K4-3 image, `niuv-builder` 2 ms in
+this one.

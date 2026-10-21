@@ -1,0 +1,3 @@
+bca4ca6ebc2babd66bc94c9b3a0132f8119058a693d856a7f24d30ecb4812e99  usr/local/bin/niuv
+c2eefa37e084f1644e83b0cd9efef9b94cb51dcd1879a2e1d6e51a78a512fbee  usr/local/bin/builder-run
+19a8625aac2b613a3e81670adb021fc05766228600c717a7a6c2e4d4b4355b9c  etc/hosts
