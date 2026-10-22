@@ -160,3 +160,7 @@ Differences from the image of K5: `musl` and `musl-dev` are 1.2.6-r3 (r2 is gone
 `beam.smp` and `erlexec` have other bytes (`exe-sha256.txt`); the niuv is `fc21b322…` (was `bca4ca6e…`); gleam is the same file.
 The base was not packed from podman layers: the Alpine root (pinned digest) with the runtime packages added by `apk add --root`.
 `records/` is of this image. Checked: `run-selftest.sh` (13 ok), the K4 acceptance suite (5 tests).
+
+Why `musl` and `musl-dev` are 1.2.6-r3 (approved 2026-10-22): r2 was dropped from Alpine v3.24's index (r3 only), so the recorded set could not be installed; `records/apk-info.txt` lists r3.
+
+Kernel of the two guests with a network (`initrd`, `base`): `Image-vsock`, made by K5-2b (kite-container `build/assets/Image-vsock`, 2026-10-22), sha256 `f5c2660e96567753abb6a40c2dc0d4b66881a96351b44a3c79c87e772aec561b`. `Image-custom` has no nf_tables, and kite's init stops at "cannot load the firewall" with `--net`. The copy is `kite-site/assets/Image-vsock` (signed there with the development key); the original is untouched. The guests without a network (builds, selftest, acceptance) use `Image-custom` (sha256 `9e181c25…`).
