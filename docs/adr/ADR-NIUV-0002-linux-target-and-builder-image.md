@@ -232,6 +232,17 @@ K4-3 の像 `sha256:40ede3aa…` の中の niuv は NIV-33 の前の物で、ゲ
 - `tools/imagetree.nim` の `list` は、island-node の `image/tools/imagetree.nim` とほぼ同じ物。kite が木を並べる口を持てば一本にできる（Future:）。
 - 派生の鎖が長くなる。最初の像から作り直すときは `build.sh` から始め、`derive.sh` の差し替えを順に当てる。
 
+## 作り直し（2026-10-22、足場の消失による）
+
+2026-10-22、足場（組んだ kite と kite_sign、開発用の鍵、kite の HOME、署名した像 `niuv/builder@sha256:1d1da016…` とその土台 `niuv/builder-k4@sha256:40ede3aa…`、署名、initrd、niuv）が一時ディレクトリごと消えた。署名した鍵が無いので、消えた像は使えない（kite は署名を確かめる）。jasagiri の決定（2026-10-22、案 (a)）: podman を使わない（fukai の決定 124）。kite の Alpine の像を網つきのゲスト（`--net`）で起こして像を組む。置き場は、どのリポジトリにも入らず消えない `~/.local/share/godsgolem/kite-site/`（0700、鍵は 0600）。
+
+- **新しい像**: `niuv/builder@sha256:4131aa3a16d670c15ca4ec9fa5e3d51c5720b9cdca983c7f7af5194d225bf079`（土台 `niuv/builder-base@sha256:83187985f489b596d3ccd33a7173489b3d8aa8b02afe8247486ca0c376c583ea`、開発用の鍵 `godsgolem-kite-site-dev`（kid `c7096c88…`）で署名）。層 1 枚、6234 エントリ（前の像と同じ数）。同じ木から 2 回 `kite pack` して digest が一致した（土台、派生の像とも）。
+- **道**: `builder/bootstrap-alpine.sh`（段: site・kite・assets・initrd・base・builder・site-env）。kite は kite-container の最後のコミット済みの版（`8489bb0d`）を `jj file show` で取り出して組む（作業場の未コミットの変更を読まない）。initrd は `guest/Dockerfile` の中身を Alpine 3.22 のゲストで同じ手順にした（`bootstrap/guest-initrd.sh`）。土台の像は `Containerfile` の中身を同じ版・同じハッシュで、`bootstrap/guest-base.sh` が網つきのゲストで組む（入力の tarball は `sha256sum -c`、Nim・OTP を組み、`apk add --root` で固定の土台の木に実行時の apk を足す）。木はゲストから tar で出し、ホストで 2 回 pack して digest の一致を要求し、取り込んで署名する。続く niuv の組み直しと派生は `derive.sh`（前と同じ作法）。網があるのはこの 2 つのゲスト（と kite 自身の Alpine の pull。digest で固定）だけ。
+- **前の像との違い**: (1) podman でなく Alpine のゲストで組んだ。(2) 土台の像は `niuv/builder-k4` の名前をやめ `niuv/builder-base`（K4 の像ではなくなったため）。(3) 土台の像が最初から今の `builder-run` を持つので、派生で変わるのは `/etc/hosts` と niuv の 2 つだけ（`derive.sh` は、`/etc/hosts` と niuv が変わり、ほかが変わらないことを要求し、`builder-run` が変わるのは許す形にした）。(4) **Alpine の索引から `musl-1.2.6-r2` と `musl-dev-1.2.6-r2` が消え（r3 だけ）、記録の版の組を再現できなかった**。この 2 つだけ r3 にし、`records/apk-info.txt` を直した（ほかの 38 個は記録のとおり一致）。(5) 入った物のバイト列は前の像と同じにならない: Nim（`opt/nim/bin/nim` `0bf3fbb1…`）、OTP（`beam.smp` `5796968a…`、`erlexec` `009dcb04…`）。gleam は同じ（配布物）。新しい niuv は `fc21b322…`（niuv `7a3f3946` の木）。
+- **ゲストの kernel**: `Image-custom`（2026-10-14）には nf_tables が無く、kite の init が `--net` のとき firewall を読めず止まる（`Unable to initialize Netlink socket`）。`--net` のゲストだけ、netfilter 入りの `Image-vsock`（kite-container `build/assets`、2026-10-22 の build、sha256 `f5c2660e…`）の複製を使った。網なしのゲスト（ビルド・受け入れの試験）は `Image-custom` で通る。
+- **確かめたこと**: 土台の像・最後の像とも `run-selftest.sh`（13 項目 ok、`RESULT ok`）。K4 の受け入れの試験（`tests/acceptance/test_builder_guest.nim`）5 件が通った。`bootstrap-alpine.sh all` を別の置き場で最初から流し直し、最後まで通ることを確かめた（その像の digest は、土台 `c93e69d3…`、派生 `8a57e197…` で、上の像とは違う）。**同じ入力からの組み直しは同じ digest にならない**（前と同じく、再現は約束していない。pin は 1 つの像の digest）。
+- **確かめていない**: 組み直しの digest が揃わない理由（OTP・Nim の成果物のどこが違うか）。Alpine 3.22 の initrd の apk が 2026-10 の版であること以外の initrd の同一性（`initramfs-kite` は `319ce1f9…`、前の物とは別）。
+
 ## 決めてほしい点
 
 （2026-10-17、jasagiri が 1〜9 を推奨どおり承認。以下は承認された案の理由として残す。）

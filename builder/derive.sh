@@ -69,9 +69,13 @@ rm "$out/hosts.new"
 "$tool" list "$tree" > "$out/records/list-derived.txt"
 diff "$out/records/list-base.txt" "$out/records/list-derived.txt" > "$out/records/diff-base-derived.txt" || true
 changed=$(grep '^[<>]' "$out/records/diff-base-derived.txt" | awk '{print $NF}' | sort -u | tr '\n' ' ')
-[ "$changed" = "/etc/hosts /usr/local/bin/builder-run /usr/local/bin/niuv " ] \
-  || { echo "derive.sh: the lists differ in [$changed], expected exactly the three files" >&2; exit 1; }
-at "step 2: only /etc/hosts, /usr/local/bin/builder-run and /usr/local/bin/niuv differ from the base ($(wc -l < "$out/records/list-base.txt") entries)"
+# A base made by bootstrap-alpine.sh already holds today's builder-run, so that one may
+# be unchanged; /etc/hosts and niuv must change, and nothing but the three may.
+case "$changed" in
+  "/etc/hosts /usr/local/bin/builder-run /usr/local/bin/niuv "|"/etc/hosts /usr/local/bin/niuv ") ;;
+  *) echo "derive.sh: the lists differ in [$changed], expected /etc/hosts, /usr/local/bin/niuv and perhaps /usr/local/bin/builder-run" >&2; exit 1 ;;
+esac
+at "step 2: only [$changed] differ from the base ($(wc -l < "$out/records/list-base.txt") entries)"
 { (cd "$tree" && shasum -a 256 usr/local/bin/niuv usr/local/bin/builder-run etc/hosts); } > "$out/records/replaced-sha256.txt"
 
 # 3

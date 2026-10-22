@@ -4,7 +4,7 @@ The recipe for the image in which `niuv build --target aarch64-linux-musl` runs
 (ADR-NIUV-0002, NIV-24 to NIV-32): Alpine 3.24, musl Nim 2.2.12 built from the
 csources distribution, Erlang/OTP 29.1.1 built from source, the upstream gleam
 1.19.1 aarch64 musl binary, and niuv itself. aarch64 only. The image is built with
-podman, put into kite's store, signed, and started by kite in a guest with no
+podman (or, since 2026-10-22, by `bootstrap-alpine.sh` in a kite guest), put into kite's store, signed, and started by kite in a guest with no
 network. This directory holds the recipe, the pinned inputs and the records;
 it holds no key and knows nothing about fukai.
 
@@ -17,6 +17,7 @@ it holds no key and knows nothing about fukai.
 | `import-sign.sh` | `kite import` of the OCI layout, then `kite_sign image` |
 | `run-selftest.sh`, `selftest.sh` | Start the image in a kite guest with `--mount` (source read-only, output read-write) and `--exit-status`; `selftest.sh` is the guest's program |
 | `builder-run` | The image's program for `niuv ... --in-builder`: runs `/ctl/run.sh`, which the host writes into a read-only mount (kite starts a program that is in the image, not in a mount) |
+| `bootstrap-alpine.sh`, `bootstrap/` | The whole scaffold without podman, under `~/.local/share/godsgolem/kite-site/`: kite from its last commit, the initramfs, a development key, the first image made in an Alpine guest with a network (`guest-base.sh`), niuv, `derive.sh`. See "If the scaffold is lost" |
 | `derive.sh` | The next image from the one before it, without podman: unpack the base's root, replace `niuv`, `builder-run` and `/etc/hosts`, `kite pack` twice (same digest required), import, check the image against the tree, sign |
 | `tools/imagetree.nim`, `tools/build.sh` | `list` (a root as comparable lines) and `unpack` (a stored image's root, built by kite's own reader); built against the kite source tree |
 | `records/` | What went in: `apk-info.txt`, `tools.txt`, `exe-sha256.txt`, `selftest.txt`, `build-record.md` |
@@ -37,6 +38,23 @@ builder/run-selftest.sh --home KITE_HOME --image niuv/builder@sha256:… \
 
 `--home` is the `HOME` kite runs with (its store is `~/.kite`, its trust file
 `~/.config/kite/trust.json`). The name given to `kite_sign` must contain a `/`.
+
+## If the scaffold is lost
+
+The kite, the key, the signed images and the initramfs are not in any repository. If they go
+(they did on 2026-10-22, with a temporary directory), `bootstrap-alpine.sh all` makes them again
+in about 30 minutes, with no podman (ADR-NIUV-0002, "作り直し (2026-10-22、足場の消失による)"):
+
+```sh
+builder/bootstrap-alpine.sh [--site DIR] all     # or the stages one by one: site kite assets initrd base builder site-env
+```
+
+It needs, on the machine: nim 2.2.12, jj, rsync, curl, codesign, python3, `~/.nimble/pkgcache`
+with the packages of `deps.tree`, and kite-container's `build/assets/Image-custom` and
+`Image-vsock` (the second has nf_tables, which a guest with `--net` needs). It prints the image
+to pin and writes `SITE/site.env` for `services/island-node/image`. The rebuilt image is not the
+same bytes as the one before; the pin is the digest it prints. If Alpine has dropped a version in
+`records/apk-info.txt` the guest stops and shows the difference (`RECORDED_APK` names a changed copy).
 
 ## Deriving the next image
 

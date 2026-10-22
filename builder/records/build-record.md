@@ -138,3 +138,25 @@ parsetoml and checksums), 1,073,152 bytes.
 Checked: the K4 acceptance suite (5 tests) on this image; `inet:gethostbyname` of
 the guest's own name: `(none)` 5014 ms in the K4-3 image, `niuv-builder` 2 ms in
 this one.
+
+## The image of 2026-10-22: made again without podman, after the scaffold was lost
+
+The scaffold of K5 (kite, key, signed images, initramfs) was gone with a temporary directory, so the
+digest `sha256:1d1da016…` could no longer be started (no key to sign with). `bootstrap-alpine.sh`
+made the whole chain again in an Alpine guest with a network (ADR-NIUV-0002, "作り直し (2026-10-22、足場の消失による)").
+
+| | |
+|---|---|
+| Base (first image) | `niuv/builder-base@sha256:83187985f489b596d3ccd33a7173489b3d8aa8b02afe8247486ca0c376c583ea` (6234 entries; two packs of the tree gave this digest twice) |
+| Manifest digest (what `[builder]` pins from now on) | `sha256:4131aa3a16d670c15ca4ec9fa5e3d51c5720b9cdca983c7f7af5194d225bf079` |
+| Config digest | `sha256:c0758358578014402dc43ef7a9762e7267dfd3e721dbe5404caa0d7811c9496a` (151 bytes) |
+| Name given to kite and to `kite_sign` | `niuv/builder` |
+| Layers | 1: `sha256:33835cc8670d547b0a4e4a0b1e1b976e6296e3be0d57b0f989c96cfd1fcc4275`, 173,925,183 bytes (6234 entries, 407,462,912 bytes of tar) |
+| Made with | kite 0.2.0 from kite-container `8489bb0d` (zippy 0.10.20), guest kernel `Image-vsock` for the two guests with a network, niuv `7a3f3946` |
+| Reproduced | the derived tree packed twice gave one digest; the layer read back lists the same 6234 entries as the tree. A second run of the whole script, from nothing, gave other digests (base `c93e69d3…`, image `8a57e197…`): not reproducible, not promised |
+| Signed by | the development key `godsgolem-kite-site-dev` (kid `c7096c88925b326b1b23470910599c9f`) in kite's `dev_keys`; not a release key (fukai roadmap 118) |
+
+Differences from the image of K5: `musl` and `musl-dev` are 1.2.6-r3 (r2 is gone from Alpine's index); `nim`,
+`beam.smp` and `erlexec` have other bytes (`exe-sha256.txt`); the niuv is `fc21b322…` (was `bca4ca6e…`); gleam is the same file.
+The base was not packed from podman layers: the Alpine root (pinned digest) with the runtime packages added by `apk add --root`.
+`records/` is of this image. Checked: `run-selftest.sh` (13 ok), the K4 acceptance suite (5 tests).
