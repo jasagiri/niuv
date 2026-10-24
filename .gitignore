@@ -19,6 +19,9 @@ testresults/
 *.swp
 
 # Test binaries (the .nim files stay)
-/tests/test_all
+tests/**/test_*
+!tests/**/test_*.nim
+!tests/**/test_*/
+tests/**/*.dSYM/
 /tests/unit/*
 !/tests/unit/*.nim
