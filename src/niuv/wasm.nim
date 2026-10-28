@@ -86,23 +86,24 @@ proc nimArgs*(req: WasmRequest, nimcache: string): seq[string] {.raises: [].} =
     @["--nimcache:" & nimcache, req.program]
 
 proc nimCArgs*(tc: WasmToolchain, simd: bool, nimLib, cFile, oFile: string): seq[string] {.raises: [].} =
-  ## -w for the C that Nim generates is what Nim itself passes to clang
-  ## (config/nim.cfg, clang.options.always); Nim's own warnings are not hidden.
-  targetCFlags(tc.sysroot, simd) & @["-w", "-I" & nimLib, "-c", cFile, "-o", oFile]
+  ## Not -w, which Nim itself passes to clang: at clang's default warning
+  ## level Nim's C for wasm32 gives no warning (NIV-34), so any warning is new
+  ## and fails the build rather than vanishing into a log nobody reads.
+  targetCFlags(tc.sysroot, simd) & @["-Werror", "-I" & nimLib, "-c", cFile, "-o", oFile]
 
 proc ownCArgs*(tc: WasmToolchain, simd: bool, cFile, oFile: string): seq[string] {.raises: [].} =
   targetCFlags(tc.sysroot, simd) & @["-Wall", "-Wextra", "-Werror", "-c", cFile, "-o", oFile]
 
 proc linkArgs*(tc: WasmToolchain, simd: bool, objects: seq[string], builtins, outFile: string): seq[string] {.raises: [].} =
   targetCFlags(tc.sysroot, simd) &
-    @["-nodefaultlibs", "-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize] &
+    @["-nodefaultlibs", "-Wl,--fatal-warnings", "-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize] &
     objects & @["-lc", builtins, "-o", outFile]
 
 proc componentLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[string],
                         builtins, outFile: string): seq[string] {.raises: [].} =
   ## No C runtime and no entry: libc.a gives malloc and memcpy, and only the
   ## named functions are exported.
-  result = targetCFlags(tc.sysroot, simd) & @["-nostdlib", "-Wl,--no-entry"]
+  result = targetCFlags(tc.sysroot, simd) & @["-nostdlib", "-Wl,--no-entry", "-Wl,--fatal-warnings"]
   for e in exports: result.add "-Wl,--export=" & e
   result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize]
   result.add objects

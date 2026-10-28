@@ -64,6 +64,21 @@ suite "NIV-34 the recipe":
     check "-Wl,--max-memory=4294967296" in link
     check link[^4 .. ^1] == @["-lc", "rt.a", "-o", "x.wasm"]
 
+  test "Given Nim's C and a link, When their clang arguments are made, Then warnings fail the build instead of being silenced":
+    let c = nimCArgs(WasmToolchain(sysroot: "/s"), true, "/lib", "a.c", "a.o")
+    check "-Werror" in c
+    check "-w" notin c
+    check "-Wl,--fatal-warnings" in linkArgs(WasmToolchain(sysroot: "/s"), true, @["a.o"], "rt.a", "x.wasm")
+    check "-Wl,--fatal-warnings" in componentLinkArgs(WasmToolchain(sysroot: "/s"), true, @["a.o"], @["run"], "rt.a", "x.wasm")
+
+  test "Given a program whose generated C has a warning, When built, Then the build fails and shows the warning":
+    let d = freshDir("wasm-cwarning")
+    writeTree(d, {"main.nim": "{.emit: \"#warning \\\"a warning from the generated C\\\"\".}\necho 1\n"})
+    let built = buildWasm(toolchain(), request(d / "main.nim", d))
+    check built.isErr
+    check built.error.kind == ekBuild
+    check "a warning from the generated C" in built.error.msg
+
   test "Given a program whose nim.cfg adds a path, When built, Then the module on that path is found and int is 32-bit":
     let d = freshDir("wasm-cfg")
     writeTree(d, {"nim.cfg": "--path:\"lib\"\n", "lib/greeting.nim": "proc greeting*(): string = \"hello wasm\"\n",
