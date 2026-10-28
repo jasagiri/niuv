@@ -72,3 +72,5 @@
 | NIV-41 | tests/unit/test_wasm.nim: `NIV-41 a component of a world` | あり |
 | NIV-42 | tests/unit/test_wasm.nim: `NIV-42 component refusals` | あり |
 | NIV-43 | tests/unit/test_wasm.nim: `NIV-43 niuv wasm --component on the command line` | あり |
+| NIV-44 | tests/unit/test_wasm.nim: `NIV-44 a WASI reactor with the preview1 adapter`（world と core の形、nim-wasm-runtime の `wasm_runtime run` と wasmtime で run が ok・err） | あり |
+| NIV-45 | tests/unit/test_wasm.nim: 同上の suite（adapter が無ければ断る、既定の場所、`--wasi`・`--adapter` の組み方） | あり |

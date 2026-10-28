@@ -339,3 +339,112 @@ suite "NIV-43 niuv wasm --component on the command line":
       let r = runCli(args)
       check r.code == 2
       check says in r.stderr
+
+const
+  foundationDir = currentSourcePath().parentDir.parentDir.parentDir.parentDir
+  appWit = "package niuv:app;\n\nworld app {\n  export wasi:cli/run@0.3.0;\n}\n"
+  readingGuest = """
+import std/monotimes
+
+proc runMain(): int32 {.exportc: "niuvRunMain", cdecl.} =
+  let started = getMonoTime()
+  var text = ""
+  try:
+    text = readFile("note.txt")
+  except IOError:
+    return 1
+  if text != "file contents\n": return 1
+  if getMonoTime() < started: return 1
+  0
+
+{.emit: """ & tripleQuote & """
+__attribute__((export_name("wasi:cli/run@0.3.0#run")))
+int niuvRunExport(void) { return niuvRunMain(); }
+""" & tripleQuote & """.}
+"""
+
+proc reactorAdapter(): string =
+  ## Builds nim-wasip1-adapter's adapters into a scratch directory and returns the reactor one.
+  let outDir = freshDir("wasm-adapter")
+  let (o, code) = execCmdEx("bash " & quoteShell(foundationDir / "nim-wasip1-adapter" / "scripts" / "build-adapter.sh") &
+                            " " & quoteShell(outDir))
+  doAssert code == 0, o
+  outDir / "reactor" / "wasi_snapshot_preview1.wasm"
+
+proc wasmRuntime(): string =
+  ## nim-wasm-runtime's runner, an outside tool like wasmtime (WASM_RUNTIME overrides the place).
+  result = getEnv("WASM_RUNTIME", foundationDir / "nim-wasm-runtime" / "bin" / "wasm_runtime")
+  doAssert fileExists(result), result & " is missing: build it in nim-wasm-runtime (nimble build)"
+
+proc wasiDir(name: string): string =
+  let d = freshDir(name)
+  writeTree(d, {"wit/app.wit": appWit, "prog/main.nim": readingGuest, "data/note.txt": "file contents\n"})
+  let (o, code) = execCmdEx("cp -RL " & quoteShell(foundationDir / "nim-wasi" / "wit" / "deps") & " " &
+                            quoteShell(d / "wit" / "deps"))
+  doAssert code == 0, o
+  d
+
+proc wasiRequest(d, adapter: string): WasmRequest =
+  var r = request(d / "prog" / "main.nim", d)
+  r.shape = wsComponent
+  r.witDir = d / "wit"
+  r.world = "niuv:app/app"
+  r.adapter = adapter
+  r
+
+suite "NIV-44 a WASI reactor with the preview1 adapter":
+  test "Given a guest that exports wasi:cli/run and reads a file and the clock, When built with the adapter, Then the world is as declared and the core has no _start":
+    let d = wasiDir("wasm-wasi-reactor")
+    let built = buildWasm(componentToolchain(), wasiRequest(d, reactorAdapter()))
+    check built.isOk
+    let (wit, wcode) = execCmdEx("wasm-tools component wit " & quoteShell(built.get.component))
+    check wcode == 0
+    check "export wasi:cli/run@0.3.0;" in wit
+    check "import wasi:filesystem/preopens@0.3.0;" in wit
+    check "import wasi:clocks/monotonic-clock@0.3.0;" in wit
+    let (core, ccode) = execCmdEx("wasm-tools print " & quoteShell(built.get.wasm))
+    check ccode == 0
+    check "(export \"_start\"" notin core
+    check "(export \"_initialize\"" in core
+    check "(export \"wasi:cli/run@0.3.0#run\"" in core
+
+  test "Given that component, When run by nim-wasm-runtime with the file preopened, Then run returns ok, and err without the file":
+    let d = wasiDir("wasm-wasi-run")
+    let built = buildWasm(componentToolchain(), wasiRequest(d, reactorAdapter()))
+    check built.isOk
+    let runner = wasmRuntime()
+    let withFile = execCmdEx(quoteShell(runner) & " run " & quoteShell(built.get.component) & " --dir " &
+                             quoteShell(d / "data" & "::."))
+    check withFile.exitCode == 0
+    let empty = freshDir("wasm-wasi-run-empty")
+    let without = execCmdEx(quoteShell(runner) & " run " & quoteShell(built.get.component) & " --dir " &
+                            quoteShell(empty & "::."))
+    check without.exitCode == 1
+    let oracle = execCmdEx("wasmtime run -S p3 -W component-model-async=y --dir " & quoteShell(d / "data" & "::.") &
+                           " " & quoteShell(built.get.component))
+    check oracle.exitCode == 0
+
+  test "Given a missing adapter, When built, Then it is refused and names the script that builds it":
+    let d = wasiDir("wasm-wasi-noadapter")
+    let r = buildWasm(componentToolchain(), wasiRequest(d, d / "absent.wasm"))
+    check r.isErr
+    check r.error.kind == ekUsage
+    check "build-adapter.sh" in r.error.msg
+
+  test "Given no --adapter, When the default is taken, Then it is nim-wasip1-adapter's reactor adapter next to niuv":
+    check DefaultAdapter == foundationDir / "nim-wasip1-adapter" / "build" / "reactor" / "wasi_snapshot_preview1.wasm"
+
+  test "Given --wasi on the command line, When run, Then no export is needed, and --adapter alone or --wasi without --component is refused":
+    let d = wasiDir("wasm-wasi-cli")
+    let adapter = reactorAdapter()
+    let ok = runCli(@["wasm", d / "prog" / "main.nim", "--component", d / "wit", "--world", "niuv:app/app",
+                      "--wasi", "--adapter", adapter, "--out", d / "o", "--stage", d / "s"])
+    check ok.code == 0
+    check ("component " & d / "o" / "main.component.wasm") in ok.stdout
+    let adapterAlone = runCli(@["wasm", d / "prog" / "main.nim", "--component", d / "wit", "--world", "niuv:app/app",
+                                "--export", "run", "--adapter", adapter])
+    check adapterAlone.code == 2
+    check "--adapter is for --wasi" in adapterAlone.stderr
+    let noComponent = runCli(@["wasm", d / "prog" / "main.nim", "--wasi"])
+    check noComponent.code == 2
+    check "--wasi is for --component" in noComponent.stderr

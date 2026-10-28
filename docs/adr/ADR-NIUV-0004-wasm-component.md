@@ -12,11 +12,17 @@
 - **NIV-42** 断るもの: プログラムの隣に `panicoverride.nim` が無い（`--os:standalone` で Nim がプログラムのディレクトリから取り込む。niuv からは渡せない。nim を走らせる前に断り、panic は止めずに trap させよと言う）、world か export が無い、world の外（WASI など）を import する core（`wasm-tools component new` の断りをそのまま渡す）、定義されていない export（リンクの断り）、PATH に `wasm-tools` が無い（NIV-38 と同じく名前を示す）。
 - **NIV-43** コマンドの行: `--component` は `--world` と 1 つ以上の `--export` を要し、`--aot` とは組まない（component の実行系は wasmtime の AOT ではない）。`--world`・`--export` は `--component` の無いときに断る。標準出力に `core <場所>` と `component <場所>`。
 
-実装は `src/niuv/wasm.nim`（`wsComponent`、`ComponentNimFlags`、`componentLinkArgs`）と `cli.nim`。E テストは `tests/unit/test_wasm.nim` の NIV-40〜43（実物の clang・wasi-sysroot・wasm-tools・wasmtime。component は `wasmtime run --invoke` で走らせる）。
+WASI 0.3 を import する world（2026-10-29 に足した。司会の決定、W4 の案 A）
+
+- **NIV-44** `--component` に `--wasi` を付けると、core は WASI の reactor になる。Nim は NIV-34 と同じ旗（wasip1。Nim の std の OS: ファイル・時計が使える）、C の入口は `reactor.c`（constructor で `NimMain` を呼ぶ。wasi-libc の `_initialize` が走らせる）、リンクは `-mexec-model=reactor`（`_start` が無い）。`component new` に `--adapt <adapter>` を渡し、preview1 の import を WASI 0.3 に写す。adapter は nim-wasip1-adapter の reactor の adapter（ファイルの名前が import の module の名前）。`--export` は無くてよい: `wasi:cli/run@0.3.0#run` のような world の名前の export は、ゲストが C の `export_name` で付ける（C の名前に書けないため）。`panicoverride.nim` は要らない（standalone ではない）。NIV-42 の「world の外の import を断る」は効かない（訂正 2026-10-29）。
+- **NIV-45** adapter の場所の既定は、niuv の隣（foundation/）の `nim-wasip1-adapter/build/reactor/wasi_snapshot_preview1.wasm`（`scripts/build-adapter.sh` が作る。build/ は版に入らない）。`--adapter FILE` で変えられ、`--wasi` の無い `--adapter`、`--component` の無い `--wasi` は使い方の誤りとして断る。adapter のファイルが無ければ、それを作る script の名前を示して断る。
+
+実装は `src/niuv/wasm.nim`（`wsComponent`、`ComponentNimFlags`、`componentLinkArgs`、`reactorLinkArgs`、`DefaultAdapter`）、`src/niuv/wasm/reactor.c` と `cli.nim`。E テストは `tests/unit/test_wasm.nim` の NIV-40〜43（実物の clang・wasi-sysroot・wasm-tools・wasmtime。component は `wasmtime run --invoke` で走らせる）。
 
 ## 確かめたこと（2026-10-29）
 
 - 小さなゲスト（seq を使う）の component が wasmtime で `21` を返し、core に import が 1 つも無い。
+- （NIV-44、2026-10-29）wasi:cli/run を export し、preopen のファイルと単調な時計を読むゲストを `--wasi` で組んだ。`wasm-tools component wit` は `export wasi:cli/run@0.3.0` と filesystem・clocks の import だけを示し、core に `_start` は無い。nim-wasm-runtime の `wasm_runtime run`（nim-wasm-component + nim-wasi）で、ファイルを見せると ok（終了 0）、見せないと err（終了 1）。wasmtime 48 の `-S p3 -W component-model-async=y` でも ok。adapter は stdout を持たない（ADR-WP1-0001 の WP1-10）ので、ゲストは結果を run の値で返す。
 - 社内の OS の `tests/fixtures/desktop_probe.nim` を、社内の OS の script と同じ world（`example:probe/probe`、`run` と `cabi_realloc`）で `niuv wasm --component` に組み、`wasm-tools validate --features all` が通り、core の import は `example:desktop/*` だけだった。
 
 ## 採らなかった案
@@ -29,3 +35,8 @@
 ## Future
 
 - Future: SIMD の既定は command と同じ（`-msimd128`、`--no-simd` で外す）。component の実行系（nim-wasm-component・社内のカーネル）が v128 を持たないと分かれば、component の既定を変える。
+
+## 訂正 (2026-10-29)
+
+- 「採らなかった案」の「Nim を `--os:linux` のまま component にする」が退けたのは、example:desktop だけの world に WASI を持ち込むことである。WASI 0.3 を import する world には、wasip1 で組み、preview1 → WASI 0.3 の adapter を付けた形を使う（司会の決定、W4 の案 A）。その形の規則は NIV-44 以降に足す。
+- NIV-42 の「world の外（WASI など）を import する core を断る」は、freestanding の形（`--adapter` の無い `--component`）だけに効く。adapter を付けた形の core は wasi_snapshot_preview1 を import し、adapter がそれを WASI 0.3 に写す。

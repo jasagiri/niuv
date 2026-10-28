@@ -20,6 +20,8 @@ commands:
                             [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
                             [--llvm DIR] [--sysroot DIR]
                             [--component WIT-DIR --world PKG/WORLD --export NAME...]  a component of a WIT world
+                              [--wasi [--adapter FILE]]  the core is a WASI reactor, wrapped with the preview1
+                              reactor adapter (default: nim-wasip1-adapter's build/reactor next to niuv)
 
 options:
   --workspace FILE          the niuv.workspace.toml (default: the nearest one above the current directory)
@@ -238,7 +240,7 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
 
 proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
   let p = parseArgs(args, ["--out", "--name", "--stage", "--nim-flag", "--llvm", "--sysroot",
-                           "--component", "--world", "--export"], ["--no-simd", "--aot"])
+                           "--component", "--world", "--export", "--adapter"], ["--no-simd", "--aot", "--wasi"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len != 1: return usageFail("wasm needs one Nim program")
   let last = proc (name, default: string): string =
@@ -256,14 +258,19 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
   if component:
     if aot: return usageFail("--aot is for command modules, not --component")
     if not p.get.opts.hasKey("--world"): return usageFail("--component needs --world")
-    if not p.get.opts.hasKey("--export"): return usageFail("--component needs at least one --export")
+    if not p.get.opts.hasKey("--export") and not p.get.opts.hasKey("--wasi"):
+      return usageFail("--component needs at least one --export (or --wasi)")
+    if p.get.opts.hasKey("--adapter") and not p.get.opts.hasKey("--wasi"):
+      return usageFail("--adapter is for --wasi")
   else:
-    for o in ["--world", "--export"]:
+    for o in ["--world", "--export", "--adapter", "--wasi"]:
       if p.get.opts.hasKey(o): return usageFail(o & " is for --component")
-  var witDir = ""
+  var witDir, adapter = ""
   if component:
     try:
       witDir = normalizedPath(absolutePath(last("--component", "")))
+      if p.get.opts.hasKey("--wasi"):
+        adapter = normalizedPath(absolutePath(last("--adapter", DefaultAdapter)))
     except CatchableError as e:
       return fail(e.msg)
   let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot, component)
@@ -273,7 +280,7 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
                         nimFlags: p.get.opts.getOrDefault("--nim-flag"),
                         simd: not p.get.opts.hasKey("--no-simd"), aot: aot,
                         shape: (if component: wsComponent else: wsCommand), witDir: witDir,
-                        world: last("--world", ""), exports: p.get.opts.getOrDefault("--export"))
+                        world: last("--world", ""), exports: p.get.opts.getOrDefault("--export"), adapter: adapter)
   let r = buildWasm(tc.get, req)
   if r.isErr: return fail($r.error)
   var o = (if component: "core " else: "wasm ") & r.get.wasm & "\n"

@@ -33,6 +33,7 @@ const
   StackSize* = 8 * 1024 * 1024
   MaxMemory* = 4294967296'i64
   StartSource = staticRead("wasm/start.c")
+  ReactorSource = staticRead("wasm/reactor.c")
   Multi3Source = staticRead("wasm/multi3.c")
   CompilerRtCandidates* = [
     "lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
@@ -41,6 +42,10 @@ const
     ## Where clang's resource directory keeps a wasm32 compiler-rt, in the
     ## layouts of LLVM's per-target runtimes and of wasi-sdk.
   MaxCompilerOutput = 8192
+  DefaultAdapter* = currentSourcePath().parentDir.parentDir.parentDir.parentDir /
+    "nim-wasip1-adapter" / "build" / "reactor" / "wasi_snapshot_preview1.wasm"
+    ## nim-wasip1-adapter's reactor adapter next to this niuv in foundation/,
+    ## built by its scripts/build-adapter.sh (build/ is not committed).
 
 type
   WasmShape* = enum
@@ -69,6 +74,7 @@ type
     witDir*: string          ## wsComponent: the WIT package with its deps
     world*: string           ## wsComponent: <package>/<world>
     exports*: seq[string]    ## wsComponent: the core exports (with cabi_realloc when the world needs it)
+    adapter*: string         ## wsComponent: a preview1 reactor adapter; then the core is a WASI reactor (NIV-44)
 
   WasmOutput* = object
     wasm*, cwasm*: string    ## wsComponent: `wasm` is <name>.core.wasm
@@ -81,7 +87,7 @@ proc targetCFlags*(sysroot: string, simd: bool): seq[string] {.raises: [].} =
   if simd: result.add "-msimd128"
 
 proc nimArgs*(req: WasmRequest, nimcache: string): seq[string] {.raises: [].} =
-  let recipe = if req.shape == wsComponent: @ComponentNimFlags else: @WasmNimFlags
+  let recipe = if req.shape == wsComponent and req.adapter.len == 0: @ComponentNimFlags else: @WasmNimFlags
   @["c", "--compileOnly", "--hints:off"] & recipe & req.nimFlags &
     @["--nimcache:" & nimcache, req.program]
 
@@ -108,6 +114,15 @@ proc componentLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[str
   result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize]
   result.add objects
   result.add @[tc.sysroot / "lib" / Wasm32Wasip1 / "libc.a", builtins, "-o", outFile]
+
+proc reactorLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[string],
+                      builtins, outFile: string): seq[string] {.raises: [].} =
+  ## A wasi-libc reactor: _initialize instead of _start, and the named exports.
+  result = targetCFlags(tc.sysroot, simd) & @["-mexec-model=reactor", "-nodefaultlibs", "-Wl,--fatal-warnings"]
+  for e in exports: result.add "-Wl,--export=" & e
+  result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize]
+  result.add objects
+  result.add @["-lc", builtins, "-o", outFile]
 
 proc compilerRtIn*(resourceDir: string): string {.raises: [].} =
   ## The wasm32 compiler-rt under clang's resource directory, or "".
@@ -226,11 +241,16 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
   if not fileExists(req.program):
     return err(niuvError(ekUsage, req.program & " does not exist"))
   if req.shape == wsComponent:
-    if req.world.len == 0 or req.exports.len == 0:
-      return err(niuvError(ekUsage, "a component needs a world and at least one export"))
+    if req.world.len == 0:
+      return err(niuvError(ekUsage, "a component needs a world"))
+    if req.adapter.len == 0 and req.exports.len == 0:
+      return err(niuvError(ekUsage, "a freestanding component needs at least one export"))
     if not dirExists(req.witDir):
       return err(niuvError(ekUsage, req.witDir & " is not a directory of WIT files"))
-    if not fileExists(req.program.parentDir / "panicoverride.nim"):
+    if req.adapter.len > 0 and not fileExists(req.adapter):
+      return err(niuvError(ekUsage, "the preview1 adapter " & req.adapter & " does not exist " &
+                           "(nim-wasip1-adapter's scripts/build-adapter.sh builds it)"))
+    if req.adapter.len == 0 and not fileExists(req.program.parentDir / "panicoverride.nim"):
       return err(niuvError(ekUsage, "--os:standalone needs panicoverride.nim next to " & req.program &
                            " (Nim includes it from the program's directory); its panic should trap " &
                            "(`{.emit: \"__builtin_trap();\".}`), not loop"))
@@ -265,6 +285,11 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
     objects.add req.stageDir / "start.o"
     output.wasm = req.outDir / (req.name & ".wasm")
   else:
+    if req.adapter.len > 0:
+      let reactorC = req.stageDir / "reactor.c"
+      ?writeSource(reactorC, ReactorSource)
+      ?runStep(tc.clang, ownCArgs(tc, req.simd, reactorC, req.stageDir / "reactor.o"), "clang for the reactor entry")
+      objects.add req.stageDir / "reactor.o"
     output.wasm = req.outDir / (req.name & ".core.wasm")
   var builtins = tc.compilerRt
   if builtins.len > 0:
@@ -280,7 +305,9 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
   let args =
     case req.shape
     of wsCommand: linkArgs(tc, req.simd, objects, builtins, output.wasm)
-    of wsComponent: componentLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm)
+    of wsComponent:
+      if req.adapter.len > 0: reactorLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm)
+      else: componentLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm)
   let link = ?runProcess(tc.clang, args)
   if link.code != 0:
     var msg = "link failed (exit " & $link.code & "):\n" & tail(link.output, MaxCompilerOutput)
@@ -293,7 +320,9 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
     output.component = req.outDir / (req.name & ".component.wasm")
     ?runStep(tc.wasmTools, @["component", "embed", req.witDir, "--world", req.world, output.wasm, "-o", embedded],
              "wasm-tools component embed")
-    ?runStep(tc.wasmTools, @["component", "new", embedded, "-o", output.component], "wasm-tools component new")
+    var newArgs = @["component", "new", embedded, "-o", output.component]
+    if req.adapter.len > 0: newArgs.add @["--adapt", req.adapter]
+    ?runStep(tc.wasmTools, newArgs, "wasm-tools component new")
   if req.aot:
     output.cwasm = req.outDir / (req.name & ".cwasm")
     ?runStep(tc.wasmtime, @["compile", "-o", output.cwasm, output.wasm], "wasmtime compile")
