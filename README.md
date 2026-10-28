@@ -52,6 +52,7 @@ niuv lock [--workspace FILE]                 # ツール・パッケージ・外
 niuv check <package>                         # 閉包を依存が先の順に並べる
 niuv build <package> [--out DIR] [--bin NAME]... [--stage DIR]
 niuv child                                   # nim-frames の枠で 1 つのビルドの頼みを受ける（腐海の子）
+niuv --version                               # 版と、組んだソースの指紋。ソースが後で変わっていれば、ほかのコマンドは作り直しを求めて断る（ADR-NIUV-0005）
 niuv wasm <program.nim> [--out DIR] [--aot] [--nim-flag F]... [--no-simd]   # 1 つの Nim のプログラムを wasm32-wasip1 に組む（宣言・ロックなし）
 niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --export NAME... [--out DIR]   # WIT の world の component に組む（ADR-NIUV-0004）
 niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --wasi [--adapter FILE]       # WASI 0.3 を import する world: wasip1 の reactor に adapter を付ける

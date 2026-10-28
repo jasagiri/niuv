@@ -1,7 +1,7 @@
 ## The command line (NIV-22, NIV-39): lock, check, build, child, wasm. Nothing else.
 
 import std/[options, os, sequtils, strutils, tables]
-import ./[artifact, build, child, errors, inbuilder, lock, resolve, wasm, workspace]
+import ./[artifact, build, child, errors, fingerprint, inbuilder, lock, resolve, wasm, workspace]
 
 type
   CliResult* = object
@@ -12,6 +12,7 @@ const
   Usage = """usage: niuv <command> [options]
 
 commands:
+  --version                 the version and the fingerprint of the sources this binary was built from
   lock                      pin tools, packages and external dependencies (writes niuv.lock, or niuv.<target>.lock)
   check <package>           resolve the closure of a package and list it
   build <package>           build the package's artifacts [--out DIR] [--bin NAME]... [--stage DIR]
@@ -288,8 +289,38 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
   if r.get.cwasm.len > 0: o.add "cwasm " & r.get.cwasm & "\n"
   CliResult(stdout: o, stderr: r.get.notes.mapIt("niuv: note: " & it & "\n").join(""))
 
-proc runCli*(args: seq[string]): CliResult {.raises: [].} =
+const NiuvVersion = block:
+  var v = ""
+  for line in staticRead(SourceRoot / "niuv.nimble").splitLines():
+    if line.startsWith("version"): v = line.split('"')[1]
+  v
+
+proc versionText(built, sources: string): CliResult {.raises: [].} =
+  let state = freshness(built, sources)
+  if state.isErr: return fail($state.error)
+  let said =
+    case state.get
+    of frFresh: "matches the sources in " & sources
+    of frStale: "STALE: the sources in " & sources & " changed after this binary was built"
+    of frNoSources: "its sources are not at " & sources & " (cannot check)"
+  CliResult(stdout: "niuv " & NiuvVersion & " source " & built & "\n" & said & "\n")
+
+proc refuseStale(built, sources: string): CliResult {.raises: [].} =
+  ## A binary older than its sources builds with rules the sources no longer
+  ## have (NIV-46), so every command but --version and --help refuses.
+  let state = freshness(built, sources)
+  if state.isErr: return fail($state.error)
+  if state.get == frStale:
+    return fail("this niuv was built from older sources than those in " & sources &
+                "; rebuild it: " & RebuildCommand)
+  CliResult()
+
+proc runCli*(args: seq[string], built = BuildFingerprint, sources = SourceRoot): CliResult {.raises: [].} =
   if args.len == 0: return usageFail("no command")
+  if args[0] == "--version": return versionText(built, sources)
+  if args[0] notin ["--help", "-h", "help"]:
+    let refused = refuseStale(built, sources)
+    if refused.code != 0: return refused
   case args[0]
   of "--help", "-h", "help": CliResult(stdout: Usage)
   of "lock": cmdLock(args[1 .. ^1])

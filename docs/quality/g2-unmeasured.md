@@ -23,3 +23,4 @@
 | src/niuv/target.nim | 未測定（K4-2 で追加） |
 | src/niuv/inbuilder.nim | 未測定（K4-2 で追加） |
 | src/niuv/wasm.nim | 未測定 |
+| src/niuv/fingerprint.nim | 未測定 |

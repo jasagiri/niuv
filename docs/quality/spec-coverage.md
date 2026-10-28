@@ -74,3 +74,9 @@
 | NIV-43 | tests/unit/test_wasm.nim: `NIV-43 niuv wasm --component on the command line` | あり |
 | NIV-44 | tests/unit/test_wasm.nim: `NIV-44 a WASI reactor with the preview1 adapter`（world と core の形、nim-wasm-runtime の `wasm_runtime run` と wasmtime で run が ok・err） | あり |
 | NIV-45 | tests/unit/test_wasm.nim: 同上の suite（adapter が無ければ断る、既定の場所、`--wasi`・`--adapter` の組み方） | あり |
+
+## ADR-NIUV-0005（自分のソースの指紋）
+
+| 規則 | E テスト（ファイル: suite 名） | 状態 |
+|---|---|---|
+| NIV-46 | tests/unit/test_fingerprint.nim: `NIV-46 the fingerprint of niuv's sources` | あり |
