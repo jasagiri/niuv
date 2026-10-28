@@ -1,6 +1,6 @@
 # ADR-NIUV-0003: Nim のプログラムを wasm32-wasip1 に組む手順は niuv が 1 つだけ持つ
 
-**Status**: accepted（2026-10-28、司会 (team-lead) の指示「niuv の wasm32-wasip1 の目標を 1 つの持ち主にする」。代表の記録は無い。下の「代表に確かめること」）
+**Status**: accepted（2026-10-28、代表の決定「niuv を wasm32-wasip1 のビルドのただ 1 つの持ち主とし、ADR-NIUV-0003 を採る」。司会 (team-lead) の指示で起草）
 **Date**: 2026-10-28
 **出どころ**: シェルを 社内の OS に WASM で載せる計画と W0 の測定。手順が 4 か所に写されていた: 社内の描画器 の `wasm/build.sh` と `start.c`（a95ca7d3）、社内のブラウザのシェル の `wasm/`（362b571f）、社内のデスクトップの手元のビルド、社内の skill の SDK の `scripts/build_nim_skill.sh`。
 **仮説の層**: 実装。支配軸: 整合性（同じ問いに答える手順を 1 つにする）。想定する失敗: 名ばかりの完了（「compiler-rt を扱った」と書いて、足りない記号で黙って落ちる）、早合点（リンクが通ったことを、`__multi3` が正しく掛けることと等価視する）。
@@ -29,10 +29,10 @@
 - **Nim の `main` の名前を `-Dmain=…` で変えて呼ぶ**（社内の描画器の `build.sh`）: Nim の生成する C の名前を前処理器で書き換える。`--noMain` は Nim が用意する口で、`cmdCount`・`cmdLine` を入口が渡す形がはっきりする。
 - **compiler-rt を入れる・取ってくる**: niuv は取得しない（ADR-NIUV-0001 の B7）。入れるかは代表が決める。
 
-## 代表に確かめること
+## 代表の決定と、残る問い
 
-- この ADR は ADR-NIUV-0001 の NIV-04（「WASM のコンパイル手順は持たない」）と NIV-22（コマンドは 4 つだけ）、ADR-NIUV-0002 の NIV-24（クロスコンパイルをしない）を改める。司会の指示によるもので、代表の記録は無い（RC-7 a）。
-- `brew install wasi-runtimes` を入れれば `multi3.c` は使われなくなる。入れるかどうか。
+- 決定（2026-10-28）: この ADR を採る。ADR-NIUV-0001 の NIV-04（「WASM のコンパイル手順は持たない」）と NIV-22（コマンドは 4 つだけ）を改め、ADR-NIUV-0002 の NIV-24（クロスコンパイルをしない）の外に `niuv wasm` を置く。
+- 未決: `brew install wasi-runtimes` を入れれば `multi3.c` は使われなくなる。入れるかどうかは代表が決める。
 
 ## Future
 
