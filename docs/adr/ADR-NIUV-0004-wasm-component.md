@@ -1,6 +1,6 @@
 # ADR-NIUV-0004: WIT の world の component も `niuv wasm` が組む
 
-**Status**: accepted（2026-10-29。代表の決定 2026-10-28「niuv を wasm32-wasip1 のビルドのただ 1 つの持ち主とする」の範囲として、社内のデスクトップの頼み (W4) で起草。形を足すことそのものへの代表の個別の記録は無い）
+**Status**: 決定の記録なし。ADR-NIUV-0003（代表が 2026-10-28 に承認: niuv は wasm32 の作り方のただ 1 つの持ち主）の範囲で、社内のデスクトップの頼み (W4) により実装した（2026-10-29）。この形を足すことの承認は司会が代表に確かめている
 **Date**: 2026-10-29
 **出どころ**: 社内のデスクトップの頼み（2026-10-29、W4: 社内のデスクトップの背を、`example:desktop/desktop@0.1.0` を含む world の component として host で試す）。native も同じものを要する（計画の W4「シェルを component にする」）。手順は 社内の OS の `tools/build-desktop-probe.sh` に手書きで在った。ADR-NIUV-0003 の Future（`--app:lib` の形）の一つ。
 **仮説の層**: 実装。支配軸: 整合性（component の組み方を 2 か所目に写させない）。想定する失敗: 早合点（`component new` が通ったことを、core が world の外を import していないことと等価視する）。
