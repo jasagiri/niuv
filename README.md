@@ -52,11 +52,14 @@ niuv lock [--workspace FILE]                 # ツール・パッケージ・外
 niuv check <package>                         # 閉包を依存が先の順に並べる
 niuv build <package> [--out DIR] [--bin NAME]... [--stage DIR]
 niuv child                                   # nim-frames の枠で 1 つのビルドの頼みを受ける（腐海の子）
+niuv wasm <program.nim> [--out DIR] [--aot] [--nim-flag F]... [--no-simd]   # 1 つの Nim のプログラムを wasm32-wasip1 に組む（宣言・ロックなし）
 
 # Linux の目標（ADR-NIUV-0002）: ホストの macOS から、署名したビルド用の像の中で（kite のゲスト、網なし）
 niuv lock  --target aarch64-linux-musl --in-builder --builder NAME@sha256:<digest> [--repin-builder] [ゲストの旗]  # ロックが別の像を pin していれば、--repin-builder が要る
 niuv build <package> --target aarch64-linux-musl --in-builder --out DIR [--signature FILE] [--hex-cache DIR] [ゲストの旗]
 ```
+
+`niuv wasm` は Nim のプログラムを wasm32-wasip1 のコマンドのモジュールに組む、ただ 1 つの手順（[ADR-NIUV-0003](docs/adr/ADR-NIUV-0003-wasm32-wasip1.md)、NIV-34〜39）。テストの task やベンチはこれを呼び、自前の `build.sh` を持たない。Homebrew の llvm には wasm32 の compiler-rt が無いので、`__multi3` は niuv の写しをリンクし、その旨を注に出す（`brew install wasi-runtimes` を入れるかは代表が決める）。
 
 `build` はロックが無い・古い、ツールの版か実行ファイルがロックと違う、閉包に同じ外の依存が 2 つの版で来る、のどれかで断る。出力先には成果物と `niuv.manifest.cbor`、`niuv.sbom.cdx.json` だけが置かれ、コンパイラの作業場（nimcache）と Gleam の写しは置き場の根（`--stage`、既定は一時ディレクトリの `niuv-stage`）の下に置かれる。
 

@@ -1,7 +1,7 @@
-## The command line (NIV-22): lock, check, build, child. Nothing else.
+## The command line (NIV-22, NIV-39): lock, check, build, child, wasm. Nothing else.
 
-import std/[options, os, strutils, tables]
-import ./[artifact, build, child, errors, inbuilder, lock, resolve, workspace]
+import std/[options, os, sequtils, strutils, tables]
+import ./[artifact, build, child, errors, inbuilder, lock, resolve, wasm, workspace]
 
 type
   CliResult* = object
@@ -16,6 +16,9 @@ commands:
   check <package>           resolve the closure of a package and list it
   build <package>           build the package's artifacts [--out DIR] [--bin NAME]... [--stage DIR]
   child                     serve one build request on frames (for the key keeper's children)
+  wasm <program.nim>        build one Nim program as a wasm32-wasip1 command module (not locked)
+                            [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
+                            [--llvm DIR] [--sysroot DIR]
 
 options:
   --workspace FILE          the niuv.workspace.toml (default: the nearest one above the current directory)
@@ -232,6 +235,33 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
   o.add "sbom " & sbomPath & "\n"
   CliResult(stdout: o)
 
+proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
+  let p = parseArgs(args, ["--out", "--name", "--stage", "--nim-flag", "--llvm", "--sysroot"], ["--no-simd", "--aot"])
+  if p.isErr: return usageFail(p.error)
+  if p.get.positional.len != 1: return usageFail("wasm needs one Nim program")
+  let last = proc (name, default: string): string =
+    let given = p.get.opts.getOrDefault(name)
+    if given.len > 0: given[^1] else: default
+  var program, outDir: string
+  try:
+    program = normalizedPath(absolutePath(p.get.positional[0]))
+    outDir = normalizedPath(absolutePath(last("--out", program.parentDir / "build" / Wasm32Wasip1)))
+  except CatchableError as e:
+    return fail(e.msg)
+  let name = last("--name", program.extractFilename.changeFileExt(""))
+  let aot = p.get.opts.hasKey("--aot")
+  let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot)
+  if tc.isErr: return fail($tc.error)
+  let req = WasmRequest(program: program, outDir: outDir, name: name,
+                        stageDir: stageFor(last("--stage", defaultStageRoot()), outDir, name),
+                        nimFlags: p.get.opts.getOrDefault("--nim-flag"),
+                        simd: not p.get.opts.hasKey("--no-simd"), aot: aot)
+  let r = buildWasm(tc.get, req)
+  if r.isErr: return fail($r.error)
+  var o = "wasm " & r.get.wasm & "\n"
+  if r.get.cwasm.len > 0: o.add "cwasm " & r.get.cwasm & "\n"
+  CliResult(stdout: o, stderr: r.get.notes.mapIt("niuv: note: " & it & "\n").join(""))
+
 proc runCli*(args: seq[string]): CliResult {.raises: [].} =
   if args.len == 0: return usageFail("no command")
   case args[0]
@@ -240,4 +270,5 @@ proc runCli*(args: seq[string]): CliResult {.raises: [].} =
   of "check": cmdCheck(args[1 .. ^1])
   of "build": cmdBuild(args[1 .. ^1])
   of "child": CliResult(code: runBuildChild())
+  of "wasm": cmdWasm(args[1 .. ^1])
   else: usageFail("unknown command '" & args[0] & "'")

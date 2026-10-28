@@ -50,3 +50,16 @@
 - 「あり」は、その suite が `tests/test_all.nim` に入っており、全部緑であること（`tests/acceptance/` は fukai の兄弟リポジトリを読むので test_all の外で、手で流す）。テストが無い規則の行は「未実装」と書く。実装と同じ変更でこの表を更新する。
 - 警告 0 は `nim check tests/test_all.nim` で確かめる。
 - 対象外の文（G0）は `docs/adr/ADR-NIUV-0001.md` の「対象外」の表にある。
+
+## ADR-NIUV-0003（wasm32-wasip1）
+
+実装は `src/niuv/wasm.nim`、`src/niuv/wasm/{start,multi3}.c`、`cli.nim`。テストは実物の nim・clang・wasi-sysroot・wasmtime を使い、`test_all` の中にある。
+
+| 規則 | E テスト（ファイル: suite 名） | 状態 |
+|---|---|---|
+| NIV-34 | tests/unit/test_wasm.nim: `NIV-34 the recipe` | あり |
+| NIV-35 | tests/unit/test_wasm.nim: `NIV-35 the C entry` | あり |
+| NIV-36 | tests/unit/test_wasm.nim: `NIV-36 the 128-bit multiply` | あり |
+| NIV-37 | tests/unit/test_wasm.nim: `NIV-37 outputs and the stage` | あり |
+| NIV-38 | tests/unit/test_wasm.nim: `NIV-38 refusals` | あり |
+| NIV-39 | tests/unit/test_wasm.nim: `NIV-39 niuv wasm on the command line`（--help に wasm も） | あり |
