@@ -19,6 +19,7 @@ commands:
   wasm <program.nim>        build one Nim program as a wasm32-wasip1 command module (not locked)
                             [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
                             [--llvm DIR] [--sysroot DIR]
+                            [--component WIT-DIR --world PKG/WORLD --export NAME...]  a component of a WIT world
 
 options:
   --workspace FILE          the niuv.workspace.toml (default: the nearest one above the current directory)
@@ -236,7 +237,8 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
   CliResult(stdout: o)
 
 proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
-  let p = parseArgs(args, ["--out", "--name", "--stage", "--nim-flag", "--llvm", "--sysroot"], ["--no-simd", "--aot"])
+  let p = parseArgs(args, ["--out", "--name", "--stage", "--nim-flag", "--llvm", "--sysroot",
+                           "--component", "--world", "--export"], ["--no-simd", "--aot"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len != 1: return usageFail("wasm needs one Nim program")
   let last = proc (name, default: string): string =
@@ -250,15 +252,32 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
     return fail(e.msg)
   let name = last("--name", program.extractFilename.changeFileExt(""))
   let aot = p.get.opts.hasKey("--aot")
-  let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot)
+  let component = p.get.opts.hasKey("--component")
+  if component:
+    if aot: return usageFail("--aot is for command modules, not --component")
+    if not p.get.opts.hasKey("--world"): return usageFail("--component needs --world")
+    if not p.get.opts.hasKey("--export"): return usageFail("--component needs at least one --export")
+  else:
+    for o in ["--world", "--export"]:
+      if p.get.opts.hasKey(o): return usageFail(o & " is for --component")
+  var witDir = ""
+  if component:
+    try:
+      witDir = normalizedPath(absolutePath(last("--component", "")))
+    except CatchableError as e:
+      return fail(e.msg)
+  let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot, component)
   if tc.isErr: return fail($tc.error)
   let req = WasmRequest(program: program, outDir: outDir, name: name,
                         stageDir: stageFor(last("--stage", defaultStageRoot()), outDir, name),
                         nimFlags: p.get.opts.getOrDefault("--nim-flag"),
-                        simd: not p.get.opts.hasKey("--no-simd"), aot: aot)
+                        simd: not p.get.opts.hasKey("--no-simd"), aot: aot,
+                        shape: (if component: wsComponent else: wsCommand), witDir: witDir,
+                        world: last("--world", ""), exports: p.get.opts.getOrDefault("--export"))
   let r = buildWasm(tc.get, req)
   if r.isErr: return fail($r.error)
-  var o = "wasm " & r.get.wasm & "\n"
+  var o = (if component: "core " else: "wasm ") & r.get.wasm & "\n"
+  if r.get.component.len > 0: o.add "component " & r.get.component & "\n"
   if r.get.cwasm.len > 0: o.add "cwasm " & r.get.cwasm & "\n"
   CliResult(stdout: o, stderr: r.get.notes.mapIt("niuv: note: " & it & "\n").join(""))
 

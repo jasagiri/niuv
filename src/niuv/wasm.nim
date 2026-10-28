@@ -1,9 +1,12 @@
-## Building one Nim program for wasm32-wasip1 (ADR-NIUV-0003, NIV-34..NIV-39).
+## Building one Nim program for wasm32-wasip1 (ADR-NIUV-0003, NIV-34..NIV-39;
+## the component shape: ADR-NIUV-0004, NIV-40..NIV-43).
 ##
-## This module is the one place that says how Nim becomes a WASI command
-## module: the Nim flags, the C entry, the clang flags, the 128-bit multiply
-## when no compiler-rt is at hand, and the wasmtime AOT step. Callers (test
-## tasks, benchmarks, the shell) run `niuv wasm` instead of keeping a copy.
+## This module is the one place that says how Nim becomes wasm32: a WASI
+## command module, or a component of a WIT world (a freestanding core module
+## without _start or WASI imports, wrapped by wasm-tools). It holds the Nim
+## flags, the C entry, the clang flags, the 128-bit multiply when no
+## compiler-rt is at hand, and the wasmtime AOT step. Callers (test tasks,
+## benchmarks, the shell) run `niuv wasm` instead of keeping a copy.
 ##
 ## Unlike `niuv build`, the program is not declared in a niuv.toml and is not
 ## locked: nim reads the program's own nim.cfg / config.nims, so the paths a
@@ -21,6 +24,12 @@ const
     "--exceptions:goto", "--threads:off", "--os:linux", "--cpu:wasm32", "--noMain:on"]
     ## WASI has no signals, threads or getrandom; Nim has no WASI target, and
     ## Linux's POSIX surface is what wasi-libc provides.
+  ComponentNimFlags* = [
+    "-d:release", "--mm:arc", "-d:useMalloc", "--threads:off", "--os:standalone", "--cpu:wasm32",
+    "--noMain:on", "--panics:on"]
+    ## A component's core module imports only what its world names, so Nim
+    ## builds freestanding (no WASI). ARC as in an internal desktop probe, the
+    ## first component built this way; ORC here is untried.
   StackSize* = 8 * 1024 * 1024
   MaxMemory* = 4294967296'i64
   StartSource = staticRead("wasm/start.c")
@@ -34,6 +43,10 @@ const
   MaxCompilerOutput = 8192
 
 type
+  WasmShape* = enum
+    wsCommand     ## a WASI command module (_start); NIV-34
+    wsComponent   ## a component of a WIT world; NIV-40
+
   BuiltinsKind* = enum
     bkCompilerRt    ## a wasm32 compiler-rt next to clang
     bkMulti3Shim    ## niuv's own __multi3 (multi3.c): no compiler-rt was found
@@ -41,6 +54,7 @@ type
   WasmToolchain* = object
     nim*, clang*, sysroot*: string
     wasmtime*: string        ## "" when no AOT step was asked for
+    wasmTools*: string       ## "" unless a component is built
     compilerRt*: string      ## "" when clang has none for wasm32
 
   WasmRequest* = object
@@ -51,9 +65,14 @@ type
     nimFlags*: seq[string]   ## after the recipe's flags, so they can refine them
     simd*: bool              ## -msimd128
     aot*: bool               ## also `wasmtime compile` to <name>.cwasm
+    shape*: WasmShape
+    witDir*: string          ## wsComponent: the WIT package with its deps
+    world*: string           ## wsComponent: <package>/<world>
+    exports*: seq[string]    ## wsComponent: the core exports (with cabi_realloc when the world needs it)
 
   WasmOutput* = object
-    wasm*, cwasm*: string
+    wasm*, cwasm*: string    ## wsComponent: `wasm` is <name>.core.wasm
+    component*: string       ## wsComponent: <name>.component.wasm
     builtins*: BuiltinsKind
     notes*: seq[string]
 
@@ -62,7 +81,8 @@ proc targetCFlags*(sysroot: string, simd: bool): seq[string] {.raises: [].} =
   if simd: result.add "-msimd128"
 
 proc nimArgs*(req: WasmRequest, nimcache: string): seq[string] {.raises: [].} =
-  @["c", "--compileOnly", "--hints:off"] & @WasmNimFlags & req.nimFlags &
+  let recipe = if req.shape == wsComponent: @ComponentNimFlags else: @WasmNimFlags
+  @["c", "--compileOnly", "--hints:off"] & recipe & req.nimFlags &
     @["--nimcache:" & nimcache, req.program]
 
 proc nimCArgs*(tc: WasmToolchain, simd: bool, nimLib, cFile, oFile: string): seq[string] {.raises: [].} =
@@ -77,6 +97,16 @@ proc linkArgs*(tc: WasmToolchain, simd: bool, objects: seq[string], builtins, ou
   targetCFlags(tc.sysroot, simd) &
     @["-nodefaultlibs", "-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize] &
     objects & @["-lc", builtins, "-o", outFile]
+
+proc componentLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[string],
+                        builtins, outFile: string): seq[string] {.raises: [].} =
+  ## No C runtime and no entry: libc.a gives malloc and memcpy, and only the
+  ## named functions are exported.
+  result = targetCFlags(tc.sysroot, simd) & @["-nostdlib", "-Wl,--no-entry"]
+  for e in exports: result.add "-Wl,--export=" & e
+  result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize]
+  result.add objects
+  result.add @[tc.sysroot / "lib" / Wasm32Wasip1 / "libc.a", builtins, "-o", outFile]
 
 proc compilerRtIn*(resourceDir: string): string {.raises: [].} =
   ## The wasm32 compiler-rt under clang's resource directory, or "".
@@ -99,7 +129,8 @@ proc onPath(name: string): NResult[string] {.raises: [].} =
   if found.len == 0: return toolErr[string](name & " is not on PATH")
   ok(found)
 
-proc findWasmToolchain*(llvmBin, sysroot: string, aot: bool): NResult[WasmToolchain] {.raises: [].} =
+proc findWasmToolchain*(llvmBin, sysroot: string, aot: bool,
+                        component = false): NResult[WasmToolchain] {.raises: [].} =
   ## The tools of a wasm32-wasip1 build. Each one that is missing is refused
   ## by name; none is installed or fetched.
   var tc = WasmToolchain(sysroot: sysroot)
@@ -111,6 +142,8 @@ proc findWasmToolchain*(llvmBin, sysroot: string, aot: bool): NResult[WasmToolch
     return toolErr[WasmToolchain](sysroot & " is not a wasi-sysroot (no lib/" & Wasm32Wasip1 & "; --sysroot DIR)")
   if aot:
     tc.wasmtime = ?onPath("wasmtime")
+  if component:
+    tc.wasmTools = ?onPath("wasm-tools")
   let r = ?runProcess(tc.clang, @["--target=" & Wasm32Wasip1, "-print-resource-dir"])
   if r.code != 0:
     return toolErr[WasmToolchain](tc.clang & " -print-resource-dir failed:\n" & tail(r.output, MaxCompilerOutput))
@@ -191,6 +224,17 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
   ## C files left by an earlier program would otherwise be linked in.
   if not fileExists(req.program):
     return err(niuvError(ekUsage, req.program & " does not exist"))
+  if req.shape == wsComponent:
+    if req.world.len == 0 or req.exports.len == 0:
+      return err(niuvError(ekUsage, "a component needs a world and at least one export"))
+    if not dirExists(req.witDir):
+      return err(niuvError(ekUsage, req.witDir & " is not a directory of WIT files"))
+    if not fileExists(req.program.parentDir / "panicoverride.nim"):
+      return err(niuvError(ekUsage, "--os:standalone needs panicoverride.nim next to " & req.program &
+                           " (Nim includes it from the program's directory); its panic should trap " &
+                           "(`{.emit: \"__builtin_trap();\".}`), not loop"))
+    if tc.wasmTools.len == 0:
+      return err(niuvError(ekTool, "a component needs wasm-tools (the toolchain was looked for without it)"))
   let cDir = req.stageDir / "c"
   let oDir = req.stageDir / "o"
   try:
@@ -212,11 +256,15 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
   except CatchableError as e:
     return err(niuvError(ekIo, cDir & ": " & e.msg))
   ?runAll(tc.clang, jobs, req.stageDir / "log")
-  let startC = req.stageDir / "start.c"
-  ?writeSource(startC, StartSource)
-  ?runStep(tc.clang, ownCArgs(tc, req.simd, startC, req.stageDir / "start.o"), "clang for the C entry")
-  objects.add req.stageDir / "start.o"
-  var output = WasmOutput(wasm: req.outDir / (req.name & ".wasm"))
+  var output = WasmOutput()
+  if req.shape == wsCommand:
+    let startC = req.stageDir / "start.c"
+    ?writeSource(startC, StartSource)
+    ?runStep(tc.clang, ownCArgs(tc, req.simd, startC, req.stageDir / "start.o"), "clang for the C entry")
+    objects.add req.stageDir / "start.o"
+    output.wasm = req.outDir / (req.name & ".wasm")
+  else:
+    output.wasm = req.outDir / (req.name & ".core.wasm")
   var builtins = tc.compilerRt
   if builtins.len > 0:
     output.builtins = bkCompilerRt
@@ -228,13 +276,23 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
     ?runStep(tc.clang, ownCArgs(tc, req.simd, shimC, builtins), "clang for the __multi3 shim")
     output.notes.add "no wasm32 compiler-rt next to " & tc.clang & ": linked niuv's __multi3 shim " &
                      "(`brew install wasi-runtimes` would provide compiler-rt; the owner's call)"
-  let link = ?runProcess(tc.clang, linkArgs(tc, req.simd, objects, builtins, output.wasm))
+  let args =
+    case req.shape
+    of wsCommand: linkArgs(tc, req.simd, objects, builtins, output.wasm)
+    of wsComponent: componentLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm)
+  let link = ?runProcess(tc.clang, args)
   if link.code != 0:
     var msg = "link failed (exit " & $link.code & "):\n" & tail(link.output, MaxCompilerOutput)
     if output.builtins == bkMulti3Shim and "undefined symbol: __" in link.output:
       msg.add "\nniuv's shim provides __multi3 only; this program needs more of compiler-rt " &
               "(`brew install wasi-runtimes` would provide it; the owner's call)"
     return err(niuvError(ekBuild, msg))
+  if req.shape == wsComponent:
+    let embedded = req.stageDir / (req.name & ".embedded.wasm")
+    output.component = req.outDir / (req.name & ".component.wasm")
+    ?runStep(tc.wasmTools, @["component", "embed", req.witDir, "--world", req.world, output.wasm, "-o", embedded],
+             "wasm-tools component embed")
+    ?runStep(tc.wasmTools, @["component", "new", embedded, "-o", output.component], "wasm-tools component new")
   if req.aot:
     output.cwasm = req.outDir / (req.name & ".cwasm")
     ?runStep(tc.wasmtime, @["compile", "-o", output.cwasm, output.wasm], "wasmtime compile")

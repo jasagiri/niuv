@@ -4,7 +4,7 @@ Nim・Gleam・WASM のビルドの道具。規則の正本は `docs/adr/ADR-NIUV
 
 ## 規則の置き場
 
-- 規則（NIV-NN）: `docs/adr/ADR-NIUV-0001.md`（NIV-01〜23）、`docs/adr/ADR-NIUV-0002-linux-target-and-builder-image.md`（NIV-24〜33。Linux の目標と、ビルド用の像）、`docs/adr/ADR-NIUV-0003-wasm32-wasip1.md`（NIV-34〜39。`niuv wasm`）
+- 規則（NIV-NN）: `docs/adr/ADR-NIUV-0001.md`（NIV-01〜23）、`docs/adr/ADR-NIUV-0002-linux-target-and-builder-image.md`（NIV-24〜33。Linux の目標と、ビルド用の像）、`docs/adr/ADR-NIUV-0003-wasm32-wasip1.md`（NIV-34〜39。`niuv wasm`）、`docs/adr/ADR-NIUV-0004-wasm-component.md`（NIV-40〜43。`niuv wasm --component`）
 - 規則とテストの対応（G1）: `docs/quality/spec-coverage.md`。規則を足したら、同じ変更で E テストと表の行を足す
 - 変異検査（G2）は実装が落ち着くまで流さず、`docs/quality/g2-unmeasured.md` に未測定として足す
 - 消した旧の機能: `docs/removed-2026-10-16.md`（読み戻しは `jj file show -r f06a84e1 <path>`）

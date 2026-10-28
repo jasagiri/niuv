@@ -37,4 +37,5 @@
 ## Future
 
 - Future: `niuv build` の宣言の道（`[wasm]` 節、NIV-04）から `wasm.nim` を使い、ロックに clang・wasi-sysroot・wasmtime を結ぶ。
+- 一部を ADR-NIUV-0004 で改めた（2026-10-29）: WIT の world の component（`--component`）は `niuv wasm` が組む。
 - Future: 社内の skill の SDK の部品（`--app:lib` の静的ライブラリを Rust の殻に繋ぐ）は、コマンドのモジュールではないので NIV-34 の外。乗せるなら `--app:lib` の形を規則に足す。

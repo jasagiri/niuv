@@ -212,3 +212,115 @@ suite "NIV-39 niuv wasm on the command line":
     check "unknown option --simd" in unknown.stderr
     let help = runCli(@["--help"])
     check "wasm <program.nim>" in help.stdout
+
+const
+  probeWit = "package niuv:probe;\n\nworld probe {\n    export run: func() -> u32;\n}\n"
+  heapGuest = """
+proc run(): uint32 {.exportc: "run", cdecl.} =
+  var s = newSeq[uint32]()
+  for i in 1'u32 .. 6: s.add i
+  for v in s: result += v
+"""
+  trapPanic = "proc rawoutput(s: string) = discard\nproc panic(s: string) {.noreturn.} =\n" &
+              "  {.emit: \"__builtin_trap();\".}\n  while true: discard\n"
+
+proc componentRequest(program, dir: string, exports = @["run"], world = "niuv:probe/probe"): WasmRequest =
+  var r = request(program, dir)
+  r.shape = wsComponent
+  r.witDir = dir / "wit"
+  r.world = world
+  r.exports = exports
+  r
+
+proc componentToolchain(): WasmToolchain =
+  findWasmToolchain(DefaultLlvmBin, DefaultWasiSysroot, false, component = true).get
+
+proc probeDir(name: string, guest = heapGuest, panicOverride = true): string =
+  let d = freshDir(name)
+  writeTree(d, {"wit/probe.wit": probeWit, "prog/main.nim": guest})
+  if panicOverride: writeTree(d, {"prog/panicoverride.nim": trapPanic})
+  d
+
+suite "NIV-40 the component recipe":
+  test "Given a component request, When the nim arguments are made, Then Nim builds freestanding with ARC and panics on":
+    var req = WasmRequest(program: "p.nim", shape: wsComponent)
+    let args = nimArgs(req, "/c")
+    for f in ["--os:standalone", "--mm:arc", "--panics:on", "-d:useMalloc", "--threads:off", "--noMain:on",
+              "--cpu:wasm32"]:
+      check f in args
+    check "--os:linux" notin args
+    check "--mm:orc" notin args
+
+  test "Given exports, When the component link arguments are made, Then there is no entry, no C runtime, and each export is named":
+    let link = componentLinkArgs(WasmToolchain(sysroot: "/s"), false, @["a.o"], @["run", "cabi_realloc"], "rt.a", "x.wasm")
+    check "-nostdlib" in link and "-Wl,--no-entry" in link
+    check "-Wl,--export=run" in link and "-Wl,--export=cabi_realloc" in link
+    check "/s/lib/wasm32-wasip1/libc.a" in link
+    check link[^2 .. ^1] == @["-o", "x.wasm"]
+
+suite "NIV-41 a component of a world":
+  test "Given a guest that uses the heap and a world exporting run, When built, Then the core imports nothing and the component runs":
+    let d = probeDir("wasm-component")
+    let built = buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d))
+    check built.isOk
+    check built.get.wasm == d / "out" / "prog.core.wasm"
+    check built.get.component == d / "out" / "prog.component.wasm"
+    let (printed, pcode) = execCmdEx("wasm-tools print " & quoteShell(built.get.wasm))
+    check pcode == 0
+    check "(import" notin printed
+    check "(export \"run\"" in printed
+    let (o, code) = execCmdEx("wasmtime run --invoke 'run()' " & quoteShell(built.get.component))
+    check code == 0
+    check o.strip() == "21"
+
+suite "NIV-42 component refusals":
+  test "Given no panicoverride.nim next to the program, When built, Then it is refused before nim runs and says the panic should trap":
+    let d = probeDir("wasm-component-nopanic", panicOverride = false)
+    let r = buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d))
+    check r.isErr
+    check r.error.kind == ekUsage
+    check "panicoverride.nim" in r.error.msg and "trap" in r.error.msg
+
+  test "Given no world or no export, When built, Then it is refused as a usage error":
+    let d = probeDir("wasm-component-noworld")
+    check buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d, world = "")).error.kind == ekUsage
+    check buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d, exports = @[])).error.kind == ekUsage
+
+  test "Given an export the program does not define, When built, Then the link failure is reported":
+    let d = probeDir("wasm-component-noexport")
+    let r = buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d, exports = @["run", "absent"]))
+    check r.isErr
+    check r.error.kind == ekBuild
+    check "absent" in r.error.msg
+
+  test "Given a guest that calls into WASI, When built, Then wasm-tools refuses the core module and the reason is passed on":
+    let d = probeDir("wasm-component-wasi", guest = "{.emit: \"#include <stdio.h>\".}\n" &
+      "proc puts(s: cstring): cint {.importc, nodecl.}\n" &
+      "proc run(): uint32 {.exportc: \"run\", cdecl.} =\n  discard puts(\"x\")\n  7\n")
+    let r = buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d))
+    check r.isErr
+    check r.error.kind == ekBuild
+    check "wasm-tools component" in r.error.msg
+    check "wasi" in r.error.msg
+
+suite "NIV-43 niuv wasm --component on the command line":
+  test "Given --component, --world and --export, When run, Then it prints the core and the component":
+    let d = probeDir("wasm-component-cli")
+    let r = runCli(@["wasm", d / "prog" / "main.nim", "--component", d / "wit", "--world", "niuv:probe/probe",
+                     "--export", "run", "--out", d / "o", "--stage", d / "s"])
+    check r.code == 0
+    check ("core " & d / "o" / "main.core.wasm") in r.stdout
+    check ("component " & d / "o" / "main.component.wasm") in r.stdout
+
+  test "Given --component with --aot, without --world or --export, or --world alone, When run, Then each is refused with the usage":
+    let d = probeDir("wasm-component-cli-bad")
+    let prog = d / "prog" / "main.nim"
+    let cases = [
+      (@["wasm", prog, "--component", d / "wit", "--world", "niuv:probe/probe", "--export", "run", "--aot"], "--aot"),
+      (@["wasm", prog, "--component", d / "wit", "--export", "run"], "--world"),
+      (@["wasm", prog, "--component", d / "wit", "--world", "niuv:probe/probe"], "--export"),
+      (@["wasm", prog, "--world", "niuv:probe/probe"], "--world is for --component")]
+    for (args, says) in cases:
+      let r = runCli(args)
+      check r.code == 2
+      check says in r.stderr

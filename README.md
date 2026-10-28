@@ -53,6 +53,7 @@ niuv check <package>                         # 閉包を依存が先の順に並
 niuv build <package> [--out DIR] [--bin NAME]... [--stage DIR]
 niuv child                                   # nim-frames の枠で 1 つのビルドの頼みを受ける（腐海の子）
 niuv wasm <program.nim> [--out DIR] [--aot] [--nim-flag F]... [--no-simd]   # 1 つの Nim のプログラムを wasm32-wasip1 に組む（宣言・ロックなし）
+niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --export NAME... [--out DIR]   # WIT の world の component に組む（ADR-NIUV-0004）
 
 # Linux の目標（ADR-NIUV-0002）: ホストの macOS から、署名したビルド用の像の中で（kite のゲスト、網なし）
 niuv lock  --target aarch64-linux-musl --in-builder --builder NAME@sha256:<digest> [--repin-builder] [ゲストの旗]  # ロックが別の像を pin していれば、--repin-builder が要る

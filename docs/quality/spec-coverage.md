@@ -63,3 +63,12 @@
 | NIV-37 | tests/unit/test_wasm.nim: `NIV-37 outputs and the stage` | あり |
 | NIV-38 | tests/unit/test_wasm.nim: `NIV-38 refusals` | あり |
 | NIV-39 | tests/unit/test_wasm.nim: `NIV-39 niuv wasm on the command line`（--help に wasm も） | あり |
+
+## ADR-NIUV-0004（WIT の world の component）
+
+| 規則 | E テスト（ファイル: suite 名） | 状態 |
+|---|---|---|
+| NIV-40 | tests/unit/test_wasm.nim: `NIV-40 the component recipe` | あり |
+| NIV-41 | tests/unit/test_wasm.nim: `NIV-41 a component of a world` | あり |
+| NIV-42 | tests/unit/test_wasm.nim: `NIV-42 component refusals` | あり |
+| NIV-43 | tests/unit/test_wasm.nim: `NIV-43 niuv wasm --component on the command line` | あり |
