@@ -88,7 +88,7 @@ stage_kite() {
       done )
     # nimble.paths is not committed (it names this machine's nimble packages)
     cp "$kite_repo/nimble.paths" "$src/"
-    for p in nim-virtio nim-fdt nim-outcome ig-verify nim-propcheck nim-cose-sign1 nim-cbor-det \
+    for p in nim-virtio nim-fdt nim-outcome nim-verify nim-propcheck nim-cose-sign1 nim-cbor-det \
              nim-hpke nim-secret nim-mlkem nim-vendor-lib; do ln -sfn "$found/$p" "$S/src/$p"; done
     (cd "$src" && nim c --hints:off -d:release -o:"$KITE" src/kite.nim \
        && nim c --hints:off -d:release -o:"$SIGN" tools/kite_sign.nim \
