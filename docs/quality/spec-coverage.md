@@ -80,3 +80,4 @@
 | 規則 | E テスト（ファイル: suite 名） | 状態 |
 |---|---|---|
 | NIV-46 | tests/unit/test_fingerprint.nim: `NIV-46 the fingerprint of niuv's sources` | あり |
+| NIV-47 | tests/unit/test_fingerprint.nim: `NIV-47 the exit code of niuv --version --check`、`NIV-46` の suite（断るコマンドが 3） | あり |

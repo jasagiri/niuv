@@ -42,7 +42,7 @@ suite "NIV-46 the fingerprint of niuv's sources":
     writeFile(d / "nim.cfg", "--mm:arc\n")
     for args in [@["lock"], @["build", "app"], @["wasm", "x.nim"], @["child"]]:
       let r = runCli(args, built, d)
-      check r.code == 1
+      check r.code == ExitStale
       check "rebuild it: nim c" in r.stderr
     let v = runCli(@["--version"], built, d)
     check v.code == 0
@@ -56,3 +56,21 @@ suite "NIV-46 the fingerprint of niuv's sources":
     check v.stdout.startsWith("niuv 0.")
     check BuildFingerprint in v.stdout
     check "matches the sources" in v.stdout
+
+suite "NIV-47 the exit code of niuv --version --check":
+  test "Given a current, a stale and a moved binary, When --version --check runs, Then it ends with 0, 3 and 4":
+    let d = sourceTree("fp-check")
+    let built = sourceFingerprint(d).get
+    check runCli(@["--version", "--check"], built, d).code == 0
+    writeFile(d / "src" / "niuv.nim", "echo 2\n")
+    check runCli(@["--version", "--check"], built, d).code == 3
+    check ExitStale == 3
+    check runCli(@["--version", "--check"], built, d / "absent").code == 4
+    check ExitNoSources == 4
+
+  test "Given --version without --check or with another word, When run, Then the first ends with 0 even when stale and the second is a usage error":
+    let d = sourceTree("fp-check-plain")
+    let built = sourceFingerprint(d).get
+    writeFile(d / "nim.cfg", "--mm:arc\n")
+    check runCli(@["--version"], built, d).code == 0
+    check runCli(@["--version", "--quiet"], built, d).code == 2

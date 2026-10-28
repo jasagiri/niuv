@@ -12,7 +12,8 @@ const
   Usage = """usage: niuv <command> [options]
 
 commands:
-  --version                 the version and the fingerprint of the sources this binary was built from
+  --version [--check]       the version and the fingerprint of the sources this binary was built from;
+                            with --check the exit code says: 0 current, 3 stale, 4 sources not found
   lock                      pin tools, packages and external dependencies (writes niuv.lock, or niuv.<target>.lock)
   check <package>           resolve the closure of a package and list it
   build <package>           build the package's artifacts [--out DIR] [--bin NAME]... [--stage DIR]
@@ -295,7 +296,9 @@ const NiuvVersion = block:
     if line.startsWith("version"): v = line.split('"')[1]
   v
 
-proc versionText(built, sources: string): CliResult {.raises: [].} =
+proc versionText(built, sources: string, check: bool): CliResult {.raises: [].} =
+  ## With `check`, the exit code answers whether the binary is current (NIV-47),
+  ## so callers branch on a code rather than on the text.
   let state = freshness(built, sources)
   if state.isErr: return fail($state.error)
   let said =
@@ -303,7 +306,14 @@ proc versionText(built, sources: string): CliResult {.raises: [].} =
     of frFresh: "matches the sources in " & sources
     of frStale: "STALE: the sources in " & sources & " changed after this binary was built"
     of frNoSources: "its sources are not at " & sources & " (cannot check)"
-  CliResult(stdout: "niuv " & NiuvVersion & " source " & built & "\n" & said & "\n")
+  let code =
+    if not check: 0
+    else:
+      case state.get
+      of frFresh: 0
+      of frStale: ExitStale
+      of frNoSources: ExitNoSources
+  CliResult(code: code, stdout: "niuv " & NiuvVersion & " source " & built & "\n" & said & "\n")
 
 proc refuseStale(built, sources: string): CliResult {.raises: [].} =
   ## A binary older than its sources builds with rules the sources no longer
@@ -312,12 +322,15 @@ proc refuseStale(built, sources: string): CliResult {.raises: [].} =
   if state.isErr: return fail($state.error)
   if state.get == frStale:
     return fail("this niuv was built from older sources than those in " & sources &
-                "; rebuild it: " & RebuildCommand)
+                "; rebuild it: " & RebuildCommand, ExitStale)
   CliResult()
 
 proc runCli*(args: seq[string], built = BuildFingerprint, sources = SourceRoot): CliResult {.raises: [].} =
   if args.len == 0: return usageFail("no command")
-  if args[0] == "--version": return versionText(built, sources)
+  if args[0] == "--version":
+    if args.len == 1: return versionText(built, sources, check = false)
+    if args.len == 2 and args[1] == "--check": return versionText(built, sources, check = true)
+    return usageFail("--version takes only --check")
   if args[0] notin ["--help", "-h", "help"]:
     let refused = refuseStale(built, sources)
     if refused.code != 0: return refused

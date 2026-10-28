@@ -15,6 +15,10 @@ const
   RebuildCommand* = "nim c --opt:speed --hints:off -o:" & SourceRoot / "build" / "bin" / "niuv" & " " &
                     SourceRoot / "src" / "niuv.nim"
 
+const
+  ExitStale* = 3        ## the sources changed after the binary was built (NIV-47)
+  ExitNoSources* = 4    ## the sources are not where the binary was built (NIV-47)
+
 type
   Freshness* = enum
     frFresh           ## the sources have the fingerprint the binary was built with
