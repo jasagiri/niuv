@@ -1,5 +1,5 @@
 # niuv builds itself: `niuv build niuv` in a workspace that lists this
-# directory, nim-cbor-det and nim-frames (see CLAUDE.md).
+# directory, nim-cbor-det and nim-frames (see AGENTS.md).
 [package]
 name = "niuv"
 version = "0.2.0"
