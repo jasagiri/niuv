@@ -64,6 +64,15 @@ suite "NIV-34 the recipe":
     check "-Wl,--max-memory=4294967296" in link
     check link[^4 .. ^1] == @["-lc", "rt.a", "-o", "x.wasm"]
 
+  test "NIV-48 Given a stack size, When the link arguments are made, Then every shape links that stack, and only 64 KiB..64 MiB multiples of 16 are taken":
+    let tc = WasmToolchain(sysroot: "/s")
+    check "-Wl,-z,stack-size=1048576" in linkArgs(tc, false, @["a.o"], "rt.a", "x.wasm", 1048576)
+    check "-Wl,-z,stack-size=1048576" in componentLinkArgs(tc, false, @["a.o"], @["run"], "rt.a", "x.wasm", 1048576)
+    check "-Wl,-z,stack-size=1048576" in reactorLinkArgs(tc, false, @["a.o"], @["run"], "rt.a", "x.wasm", 1048576)
+    check stackSizeValid(65536) and stackSizeValid(64 * 1024 * 1024) and stackSizeValid(StackSize)
+    check not stackSizeValid(65535) and not stackSizeValid(64 * 1024 * 1024 + 16) and not stackSizeValid(65536 + 8)
+    check not stackSizeValid(0)
+
   test "Given Nim's C and a link, When their clang arguments are made, Then warnings fail the build instead of being silenced":
     let c = nimCArgs(WasmToolchain(sysroot: "/s"), true, "/lib", "a.c", "a.o")
     check "-Werror" in c

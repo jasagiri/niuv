@@ -20,7 +20,7 @@ commands:
   child                     serve one build request on frames (for the key keeper's children)
   wasm <program.nim>        build one Nim program as a wasm32-wasip1 command module (not locked)
                             [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
-                            [--llvm DIR] [--sysroot DIR]
+                            [--llvm DIR] [--sysroot DIR] [--stack-size BYTES]  (default 8 MiB; 64 KiB..64 MiB)
                             [--component WIT-DIR --world PKG/WORLD --export NAME...]  a component of a WIT world
                               [--wasi [--adapter FILE]]  the core is a WASI reactor, wrapped with the preview1
                               reactor adapter (default: nim-wasip1-adapter's build/reactor next to niuv)
@@ -242,7 +242,7 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
 
 proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
   let p = parseArgs(args, ["--out", "--name", "--stage", "--nim-flag", "--llvm", "--sysroot",
-                           "--component", "--world", "--export", "--adapter"], ["--no-simd", "--aot", "--wasi"])
+                           "--component", "--world", "--export", "--adapter", "--stack-size"], ["--no-simd", "--aot", "--wasi"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len != 1: return usageFail("wasm needs one Nim program")
   let last = proc (name, default: string): string =
@@ -275,6 +275,14 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
         adapter = normalizedPath(absolutePath(last("--adapter", DefaultAdapter)))
     except CatchableError as e:
       return fail(e.msg)
+  var stackSize = 0
+  if p.get.opts.hasKey("--stack-size"):
+    try:
+      stackSize = parseInt(last("--stack-size", ""))
+    except ValueError:
+      return usageFail("--stack-size takes a number of bytes")
+    if not stackSizeValid(stackSize):
+      return usageFail("--stack-size takes 65536 to 67108864 bytes, a multiple of 16")
   let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot, component)
   if tc.isErr: return fail($tc.error)
   let req = WasmRequest(program: program, outDir: outDir, name: name,
@@ -282,7 +290,8 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
                         nimFlags: p.get.opts.getOrDefault("--nim-flag"),
                         simd: not p.get.opts.hasKey("--no-simd"), aot: aot,
                         shape: (if component: wsComponent else: wsCommand), witDir: witDir,
-                        world: last("--world", ""), exports: p.get.opts.getOrDefault("--export"), adapter: adapter)
+                        world: last("--world", ""), exports: p.get.opts.getOrDefault("--export"), adapter: adapter,
+                        stackSize: stackSize)
   let r = buildWasm(tc.get, req)
   if r.isErr: return fail($r.error)
   var o = (if component: "core " else: "wasm ") & r.get.wasm & "\n"

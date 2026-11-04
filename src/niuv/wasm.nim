@@ -31,6 +31,9 @@ const
     ## builds freestanding (no WASI). ARC as in an internal desktop probe, the
     ## first component built this way; ORC here is untried.
   StackSize* = 8 * 1024 * 1024
+    ## The default stack (NIV-34). `WasmRequest.stackSize` (NIV-48) replaces it.
+  MinStackSize* = 64 * 1024
+  MaxStackSize* = 64 * 1024 * 1024
   MaxMemory* = 4294967296'i64
   StartSource = staticRead("wasm/start.c")
   ReactorSource = staticRead("wasm/reactor.c")
@@ -75,6 +78,7 @@ type
     world*: string           ## wsComponent: <package>/<world>
     exports*: seq[string]    ## wsComponent: the core exports (with cabi_realloc when the world needs it)
     adapter*: string         ## wsComponent: a preview1 reactor adapter; then the core is a WASI reactor (NIV-44)
+    stackSize*: int          ## bytes of stack; 0 is StackSize (NIV-48)
 
   WasmOutput* = object
     wasm*, cwasm*: string    ## wsComponent: `wasm` is <name>.core.wasm
@@ -100,27 +104,32 @@ proc nimCArgs*(tc: WasmToolchain, simd: bool, nimLib, cFile, oFile: string): seq
 proc ownCArgs*(tc: WasmToolchain, simd: bool, cFile, oFile: string): seq[string] {.raises: [].} =
   targetCFlags(tc.sysroot, simd) & @["-Wall", "-Wextra", "-Werror", "-c", cFile, "-o", oFile]
 
-proc linkArgs*(tc: WasmToolchain, simd: bool, objects: seq[string], builtins, outFile: string): seq[string] {.raises: [].} =
+proc stackSizeValid*(bytes: int): bool {.raises: [].} =
+  ## NIV-48: a stack from 64 KiB to 64 MiB, a multiple of 16 (the wasm32 stack alignment).
+  bytes >= MinStackSize and bytes <= MaxStackSize and bytes mod 16 == 0
+
+proc linkArgs*(tc: WasmToolchain, simd: bool, objects: seq[string], builtins, outFile: string,
+               stackSize = StackSize): seq[string] {.raises: [].} =
   targetCFlags(tc.sysroot, simd) &
-    @["-nodefaultlibs", "-Wl,--fatal-warnings", "-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize] &
+    @["-nodefaultlibs", "-Wl,--fatal-warnings", "-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $stackSize] &
     objects & @["-lc", builtins, "-o", outFile]
 
 proc componentLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[string],
-                        builtins, outFile: string): seq[string] {.raises: [].} =
+                        builtins, outFile: string, stackSize = StackSize): seq[string] {.raises: [].} =
   ## No C runtime and no entry: libc.a gives malloc and memcpy, and only the
   ## named functions are exported.
   result = targetCFlags(tc.sysroot, simd) & @["-nostdlib", "-Wl,--no-entry", "-Wl,--fatal-warnings"]
   for e in exports: result.add "-Wl,--export=" & e
-  result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize]
+  result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $stackSize]
   result.add objects
   result.add @[tc.sysroot / "lib" / Wasm32Wasip1 / "libc.a", builtins, "-o", outFile]
 
 proc reactorLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[string],
-                      builtins, outFile: string): seq[string] {.raises: [].} =
+                      builtins, outFile: string, stackSize = StackSize): seq[string] {.raises: [].} =
   ## A wasi-libc reactor: _initialize instead of _start, and the named exports.
   result = targetCFlags(tc.sysroot, simd) & @["-mexec-model=reactor", "-nodefaultlibs", "-Wl,--fatal-warnings"]
   for e in exports: result.add "-Wl,--export=" & e
-  result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $StackSize]
+  result.add @["-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $stackSize]
   result.add objects
   result.add @["-lc", builtins, "-o", outFile]
 
@@ -240,6 +249,9 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
   ## C files left by an earlier program would otherwise be linked in.
   if not fileExists(req.program):
     return err(niuvError(ekUsage, req.program & " does not exist"))
+  let stack = (if req.stackSize == 0: StackSize else: req.stackSize)
+  if not stackSizeValid(stack):
+    return err(niuvError(ekUsage, "a stack of " & $stack & " bytes: give 65536 to 67108864, a multiple of 16"))
   if req.shape == wsComponent:
     if req.world.len == 0:
       return err(niuvError(ekUsage, "a component needs a world"))
@@ -304,10 +316,10 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
                      "(`brew install wasi-runtimes` would provide compiler-rt; the owner's call)"
   let args =
     case req.shape
-    of wsCommand: linkArgs(tc, req.simd, objects, builtins, output.wasm)
+    of wsCommand: linkArgs(tc, req.simd, objects, builtins, output.wasm, stack)
     of wsComponent:
-      if req.adapter.len > 0: reactorLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm)
-      else: componentLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm)
+      if req.adapter.len > 0: reactorLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm, stack)
+      else: componentLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm, stack)
   let link = ?runProcess(tc.clang, args)
   if link.code != 0:
     var msg = "link failed (exit " & $link.code & "):\n" & tail(link.output, MaxCompilerOutput)

@@ -17,6 +17,10 @@ WASI 0.3 を import する world（2026-10-29 に足した。司会の決定、W
 - **NIV-44** `--component` に `--wasi` を付けると、core は WASI の reactor になる。Nim は NIV-34 と同じ旗（wasip1。Nim の std の OS: ファイル・時計が使える）、C の入口は `reactor.c`（constructor で `NimMain` を呼ぶ。wasi-libc の `_initialize` が走らせる）、リンクは `-mexec-model=reactor`（`_start` が無い）。`component new` に `--adapt <adapter>` を渡し、preview1 の import を WASI 0.3 に写す。adapter は nim-wasip1-adapter の reactor の adapter（ファイルの名前が import の module の名前）。`--export` は無くてよい: `wasi:cli/run@0.3.0#run` のような world の名前の export は、ゲストが C の `export_name` で付ける（C の名前に書けないため）。`panicoverride.nim` は要らない（standalone ではない）。NIV-42 の「world の外の import を断る」は効かない（訂正 2026-10-29）。
 - **NIV-45** adapter の場所の既定は、niuv の隣（foundation/）の `nim-wasip1-adapter/build/reactor/wasi_snapshot_preview1.wasm`（`scripts/build-adapter.sh` が作る。build/ は版に入らない）。`--adapter FILE` で変えられ、`--wasi` の無い `--adapter`、`--component` の無い `--wasi` は使い方の誤りとして断る。adapter のファイルが無ければ、それを作る script の名前を示して断る。
 
+stack の大きさ（2026-11-05 に足した。nim-actor-guest の報告: 8 MiB の固定で、アクターの VM の既定の上限 1 MiB ではどのアクターも起こせなかった）
+
+- **NIV-48** `niuv wasm` は `--stack-size BYTES` で stack の大きさを選べる（command・component・reactor のどれにも効く。`WasmRequest.stackSize`、0 なら既定の 8 MiB の `StackSize`）。受けるのは 64 KiB から 64 MiB の、16 の倍数（wasm32 の stack の揃え）だけで、ほかは使い方の誤りとして断る。stack は線形メモリの初めに置かれるので、小さくすると、プロセスごとに要る線形メモリがその分だけ小さくなる。
+
 実装は `src/niuv/wasm.nim`（`wsComponent`、`ComponentNimFlags`、`componentLinkArgs`、`reactorLinkArgs`、`DefaultAdapter`）、`src/niuv/wasm/reactor.c` と `cli.nim`。E テストは `tests/unit/test_wasm.nim` の NIV-40〜43（実物の clang・wasi-sysroot・wasm-tools・wasmtime。component は `wasmtime run --invoke` で走らせる）。
 
 ## 確かめたこと（2026-10-29）
