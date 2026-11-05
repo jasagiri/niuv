@@ -283,3 +283,9 @@ K4-3 の像 `sha256:40ede3aa…` の中の niuv は NIV-33 の前の物で、ゲ
 ## 訂正 (2026-10-28)
 
 - NIV-24 の「クロスコンパイルをしない」は、`niuv build` の目標についての規則として残る。`niuv wasm` の wasm32-wasip1（ADR-NIUV-0003）は、ロックも目録も持たない別の道で、その外にある（代表の決定、2026-10-28。ADR-NIUV-0003）。
+
+## 改訂 (2026-11-05)
+
+- NIV-24 の範囲に `x86_64-linux-gnu` と `x86_64-linux-musl` を足した (代表の決定、2026-11-05「x86_64 の 2 つを足す」。x86-64 の Linux の機械 (Surface Laptop 4、EndeavourOS) で試験を流すため)。判定はこれまでどおり実行時: CPU は `hostCPU` (`amd64` を `x86_64` と書く)、Linux の libc は `/lib/ld-musl-<cpu>.so.1` があれば musl、無ければ glibc (`gnu`)。`aarch64-linux-gnu` はまだ目標ではなく、名指しで断る。
+- クロスコンパイルをしない規則は変わらない。x86_64 の目標は、x86_64 の機械の上で作る。x86_64 のビルド用の像 (NIV-27 の `--in-builder`) は無い: kite に x86_64 の背が無いため (ADR-KITE-0006)。
+- `niuv wasm` の `--llvm` と `--sysroot` の既定 (ADR-NIUV-0003 の NIV-39) を OS ごとに分けた。macOS は Homebrew の `llvm` と `wasi-sysroot`、ほかは `/usr/bin` と `/usr/share/wasi-sysroot` (Arch の `clang`・`wasi-libc`)。見つからなければ、これまでどおり場所を名指しして断る。

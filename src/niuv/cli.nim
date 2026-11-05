@@ -27,7 +27,8 @@ commands:
 
 options:
   --workspace FILE          the niuv.workspace.toml (default: the nearest one above the current directory)
-  --target T                lock and build for target T (aarch64-linux-musl, aarch64-macos-none): this
+  --target T                lock and build for target T (aarch64-linux-musl, aarch64-macos-none,
+                            x86_64-linux-gnu, x86_64-linux-musl): this
                             machine's own, or another one with --in-builder
   --builder NAME@sha256:D   lock --target: the builder image the target's build runs in
   --in-builder              lock and build --target T in the builder image, in a kite guest without network

@@ -23,8 +23,17 @@ suite "NIV-24 targets":
       check r.error.kind == ekUsage
       check "<cpu>-<os>-<libc>" in r.error.msg
 
-  test "Given x86_64 or glibc, When parsed, Then it is refused by name as a target niuv does not build":
-    for s in ["x86_64-linux-musl", "aarch64-linux-gnu", "x86_64-linux-glibc", "aarch64-windows-none"]:
+  test "Given the two x86_64 Linux target strings, When parsed, Then they are known Linux targets":
+    let g = parseTarget("x86_64-linux-gnu")
+    check g.isOk
+    check g.get.cpu == "x86_64" and g.get.os == "linux" and g.get.libc == "gnu"
+    check g.get.isLinux
+    let m = parseTarget("x86_64-linux-musl")
+    check m.isOk
+    check m.get.libc == "musl" and m.get.isLinux
+
+  test "Given a target with the shape but not built, When parsed, Then it is refused by name":
+    for s in ["aarch64-linux-gnu", "x86_64-linux-glibc", "aarch64-windows-none", "x86_64-macos-none"]:
       let r = parseTarget(s)
       check r.isErr
       check s in r.error.msg
@@ -37,15 +46,19 @@ suite "NIV-24 targets":
   test "Given arm64 and linux with the musl loader, When detected, Then the target is aarch64-linux-musl":
     check $detectTarget("arm64", "linux", true).get == "aarch64-linux-musl"
 
-  test "Given linux without the musl loader, When detected, Then it is refused (glibc is not a target)":
+  test "Given amd64 and linux, When detected, Then the target is x86_64-linux-musl with the musl loader and x86_64-linux-gnu without":
+    check $detectTarget("amd64", "linux", true).get == "x86_64-linux-musl"
+    check $detectTarget("amd64", "linux", false).get == "x86_64-linux-gnu"
+
+  test "Given arm64 and linux without the musl loader, When detected, Then aarch64-linux-gnu is refused by name":
     let r = detectTarget("arm64", "linux", false)
     check r.isErr
-    check "musl" in r.error.msg
+    check "aarch64-linux-gnu" in r.error.msg
 
   test "Given a CPU or OS that is not known, When detected, Then it is refused":
     check detectTarget("amd64", "macosx", false).isErr
     check detectTarget("arm64", "windows", false).isErr
-    check detectTarget("amd64", "linux", true).isErr
+    check detectTarget("riscv64", "linux", true).isErr
 
   test "Given this machine, When its target is asked, Then it is decided at run time and is a known target":
     let t = hostTarget()

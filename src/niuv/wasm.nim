@@ -15,10 +15,18 @@
 import std/[json, os, osproc, strutils]
 import ./[errors, exec, hashing]
 
+const Wasm32Wasip1* = "wasm32-wasip1"
+
+when defined(macosx):
+  const
+    DefaultLlvmBin* = "/opt/homebrew/opt/llvm/bin"         ## Homebrew's llvm (Apple's clang has no wasm32 target)
+    DefaultWasiSysroot* = "/opt/homebrew/share/wasi-sysroot"
+else:
+  const
+    DefaultLlvmBin* = "/usr/bin"                    ## a Linux distribution's clang (Arch: clang, lld)
+    DefaultWasiSysroot* = "/usr/share/wasi-sysroot"  ## Arch's wasi-libc
+
 const
-  Wasm32Wasip1* = "wasm32-wasip1"
-  DefaultLlvmBin* = "/opt/homebrew/opt/llvm/bin"
-  DefaultWasiSysroot* = "/opt/homebrew/share/wasi-sysroot"
   WasmNimFlags* = [
     "-d:release", "--mm:orc", "-d:useMalloc", "-d:noSignalHandler", "-d:nimNoGetRandom",
     "--exceptions:goto", "--threads:off", "--os:linux", "--cpu:wasm32", "--noMain:on"]

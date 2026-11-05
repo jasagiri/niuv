@@ -307,6 +307,15 @@ proc settingsFor(image: string, o: BuilderOptions): GuestSettings {.raises: [].}
                 cpu: if o.cpu > 0: o.cpu else: DefaultCpu,
                 memoryMb: if o.memoryMb > 0: o.memoryMb else: DefaultMemoryMb)
 
+proc builderHost*(host: Target): NResult[void] {.raises: [].} =
+  ## NIV-27: the builder guest is started by kite on the host, and kite runs on
+  ## macOS only (no Linux backend, ADR-KITE-0006). A Linux host builds its own
+  ## target natively instead.
+  if host.isLinux:
+    return err(niuvError(ekUsage, "--in-builder starts the builder guest with kite, which runs on macOS only; " &
+                                   "this host is " & $host & ", so build its own target without --in-builder"))
+  ok()
+
 proc linuxTarget(named: string): NResult[Target] {.raises: [].} =
   let t = ?parseTarget(named)
   if not t.isLinux:
@@ -345,6 +354,7 @@ proc freshEmptyDir(dir: string): NResult[void] {.raises: [].} =
 proc buildInBuilder*(ws: Workspace, package, namedTarget, outDir, stageRoot: string, only: seq[string],
                      o: BuilderOptions): NResult[Verified] {.raises: [].} =
   ## NIV-27: `niuv build <package> --target T --in-builder`.
+  ?builderHost(?hostTarget())
   discard ?linuxTarget(namedTarget)
   let closure = ?resolveClosure(ws, package)
   let targetLock = ?readLock(ws, namedTarget)
@@ -373,6 +383,7 @@ proc lockInBuilder*(ws: Workspace, namedTarget, builderImage, stageRoot: string,
   ## `niuv lock --target T --in-builder`: the guest locks the Linux tools; the
   ## host recomputes every package and external hash itself and takes the
   ## builder image from its own side, so the guest decides neither.
+  ?builderHost(?hostTarget())
   let linuxT = ?linuxTarget(namedTarget)
   var image = builderImage
   let existing = lockPath(ws, namedTarget)

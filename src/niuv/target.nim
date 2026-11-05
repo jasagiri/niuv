@@ -3,8 +3,9 @@
 ## niuv builds for the machine it runs on and for nothing else (no cross
 ## compiling: the ADR's "採らなかった案"). A Linux target is therefore reached by
 ## running niuv inside the builder guest (NIV-27), not by building for it here.
-## Only the two targets with a user are known; x86_64 and glibc come when a
-## user does (Future).
+## The targets with a user are known: aarch64 Linux (musl) and macOS, and
+## x86_64 Linux with glibc or musl (2026-11-05, an x86_64 Linux machine). aarch64
+## with glibc comes when a user does (Future).
 
 import std/[os, sequtils, strutils]
 import ./errors
@@ -12,7 +13,9 @@ import ./errors
 const
   LinuxMusl* = "aarch64-linux-musl"
   MacosArm64* = "aarch64-macos-none"  ## the third part is "none": macOS has no libc to choose
-  KnownTargets* = [LinuxMusl, MacosArm64]
+  X86LinuxGnu* = "x86_64-linux-gnu"
+  X86LinuxMusl* = "x86_64-linux-musl"
+  KnownTargets* = [LinuxMusl, MacosArm64, X86LinuxGnu, X86LinuxMusl]
 
 type
   Target* = object
@@ -39,27 +42,27 @@ proc parseTarget*(s: string): NResult[Target] {.raises: [].} =
                              KnownTargets.join(", "))
   ok(Target(cpu: parts[0], os: parts[1], libc: parts[2]))
 
+proc cpuPart(cpu: string): string {.raises: [].} =
+  ## The target's CPU part for Nim's name of a CPU.
+  case cpu
+  of "arm64": "aarch64"
+  of "amd64": "x86_64"
+  else: cpu
+
 proc detectTarget*(cpu, os: string, muslLoader: bool): NResult[Target] {.raises: [].} =
   ## The target of a machine from Nim's names for its CPU and OS, and from
-  ## whether `/lib/ld-musl-<cpu>.so.1` exists (a Linux without it is not musl).
-  let cpuName =
-    case cpu
-    of "arm64": "aarch64"
-    else: cpu
+  ## whether `/lib/ld-musl-<cpu>.so.1` exists (a Linux without it is glibc).
+  let cpuName = cpuPart(cpu)
   case os
   of "macosx": parseTarget(cpuName & "-macos-none")
-  of "linux":
-    if not muslLoader:
-      return targetErr[Target]("this Linux has no /lib/ld-musl-" & cpuName & ".so.1: niuv knows the musl target only")
-    parseTarget(cpuName & "-linux-musl")
+  of "linux": parseTarget(cpuName & "-linux-" & (if muslLoader: "musl" else: "gnu"))
   else:
     targetErr[Target]("no niuv target for " & cpu & " " & os)
 
 proc hostTarget*(): NResult[Target] {.raises: [].} =
   ## The machine niuv runs on, decided when it runs (hostCPU and hostOS name
   ## what this niuv was compiled on, which is what it runs on).
-  let cpuName = if hostCPU == "arm64": "aarch64" else: hostCPU
-  detectTarget(hostCPU, hostOS, fileExists("/lib/ld-musl-" & cpuName & ".so.1"))
+  detectTarget(hostCPU, hostOS, fileExists("/lib/ld-musl-" & cpuPart(hostCPU) & ".so.1"))
 
 proc ownTarget*(named: string): NResult[Target] {.raises: [].} =
   ## The target of a build that runs here (NIV-24): the machine's own. A
