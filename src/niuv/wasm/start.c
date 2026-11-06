@@ -7,6 +7,7 @@
  * (programResult, which std/unittest sets when a check fails).
  */
 #include <stdint.h>
+#include <stdlib.h>
 
 int cmdCount;
 char **cmdLine;
@@ -17,5 +18,10 @@ int main(int argc, char **argv) {
   cmdCount = argc;
   cmdLine = argv;
   NimMain();
-  return (int)nim_program_result;
+  int code = (int)nim_program_result;
+  /* Not `return code` for a failure: under wasip3 a non-zero return from main
+   * becomes wasi:cli/run's err, exit status 1, and the code is lost; exit()
+   * reaches exit-with-code (NIV-58). Under wasip1 _start calls the same exit. */
+  if (code != 0) exit(code);
+  return 0;
 }

@@ -457,3 +457,177 @@ suite "NIV-44 a WASI reactor with the preview1 adapter":
     let noComponent = runCli(@["wasm", d / "prog" / "main.nim", "--wasi"])
     check noComponent.code == 2
     check "--wasi is for --component" in noComponent.stderr
+
+# NIV-58..NIV-62 (ADR-NIUV-0008): a WASI 0.3 command component, built through wasi-libc's wasm32-wasip3.
+
+proc p3Toolchain(aot = false): WasmToolchain =
+  findWasmToolchain(DefaultLlvmBin, DefaultWasiSysroot, aot, target = wtWasip3).get
+
+proc runP3(module: string, args: seq[string] = @[], dir = "", precompiled = false): (string, int) =
+  ## wasmtime is the oracle for WASI 0.3 here, as wasmtime is for preview1 above.
+  var cmd = "wasmtime run -S p3 -W component-model-async=y "
+  if precompiled: cmd.add "--allow-precompiled "
+  if dir.len > 0: cmd.add "--dir " & quoteShell(dir & "::.") & " "
+  cmd.add quoteShell(module)
+  for a in args: cmd.add " " & quoteShell(a)
+  execCmdEx(cmd)
+
+const filesProgram = """
+import std/os
+writeFile("made.txt", "made by the guest\n")
+echo readFile("note.txt")
+echo "env=", getEnv("NIUV_PROBE", "unset")
+"""
+
+suite "NIV-58 a WASI 0.3 command":
+  test "Given the wasip3 target, When the clang flags are made, Then the target is wasm32-wasip3 and the rest is as for wasip1":
+    check targetCFlags("/s", true, wtWasip3) == @["--target=wasm32-wasip3", "--sysroot=/s", "-O2", "-msimd128"]
+    check targetCFlags("/s", false, wtWasip3) == @["--target=wasm32-wasip3", "--sysroot=/s", "-O2"]
+
+  test "Given the wasip3 target, When a program is built, Then the .wasm is a component exporting wasi:cli/run@0.3.0":
+    let d = freshDir("wasm-p3-shape")
+    writeTree(d, {"main.nim": argsProgram})
+    let built = buildWasm(p3Toolchain(), request(d / "main.nim", d))
+    check built.isOk
+    check built.get.wasm == d / "out" / "prog.wasm"
+    let (wit, code) = execCmdEx("wasm-tools component wit " & quoteShell(built.get.wasm))
+    check code == 0
+    check "export wasi:cli/run@0.3.0;" in wit
+    check "import wasi:cli/environment@0.3.0;" in wit
+
+  test "Given arguments and a program result, When the component runs, Then the program sees the arguments and exits with its result":
+    let d = freshDir("wasm-p3-args")
+    writeTree(d, {"main.nim": argsProgram})
+    let built = buildWasm(p3Toolchain(), request(d / "main.nim", d))
+    check built.isOk
+    let (o, code) = runP3(built.get.wasm, @["a b", "c"])
+    check code == 3
+    check "count=2" in o
+    check "arg=a b" in o and "arg=c" in o
+    check "intsize=4" in o
+
+  test "Given a preopened directory and an environment variable, When the component runs, Then it reads and writes there and sees only what is given":
+    let d = freshDir("wasm-p3-files")
+    writeTree(d, {"main.nim": filesProgram, "data/note.txt": "the note"})
+    let built = buildWasm(p3Toolchain(), request(d / "main.nim", d))
+    check built.isOk
+    let (o, code) = runP3(built.get.wasm, dir = d / "data")
+    check code == 0
+    check "the note" in o
+    check "env=unset" in o
+    check readFile(d / "data" / "made.txt") == "made by the guest\n"
+
+  test "Given a std/unittest program with a failing check, When the component runs, Then it exits non-zero, and zero when all pass":
+    let d = freshDir("wasm-p3-unittest")
+    writeTree(d, {"fails.nim": "import std/unittest\ntest \"one\":\n  check 1 + 1 == 3\n",
+                  "passes.nim": "import std/unittest\ntest \"one\":\n  check 1 + 1 == 2\n"})
+    let fails = buildWasm(p3Toolchain(), request(d / "fails.nim", d, "fails"))
+    let passes = buildWasm(p3Toolchain(), request(d / "passes.nim", d, "passes"))
+    check fails.isOk and passes.isOk
+    let (fo, fcode) = runP3(fails.get.wasm)
+    check fcode != 0
+    check "[FAILED]" in fo
+    let (po, pcode) = runP3(passes.get.wasm)
+    check pcode == 0
+    check "[OK]" in po
+
+suite "NIV-59 the component linker":
+  test "Given the wasip3 target, When the toolchain is found, Then wasm-component-ld from PATH is the linker clang is told to use":
+    let tc = p3Toolchain()
+    check tc.target == wtWasip3
+    check tc.componentLd.endsWith("wasm-component-ld") and fileExists(tc.componentLd)
+    check ("-fuse-ld=" & tc.componentLd) in linkArgs(tc, true, @["a.o"], "b.o", "x.wasm")
+    check linkArgs(toolchain(aot = false), true, @["a.o"], "b.o", "x.wasm").allIt(not it.startsWith("-fuse-ld="))
+
+  test "Given no wasm-component-ld on PATH, When the wasip3 toolchain is looked for, Then it is refused by name":
+    let saved = getEnv("PATH")
+    let nimOnly = freshDir("wasm-p3-path")
+    createSymlink(findExe("nim"), nimOnly / "nim")
+    putEnv("PATH", nimOnly)
+    let r = findWasmToolchain(DefaultLlvmBin, DefaultWasiSysroot, false, target = wtWasip3)
+    putEnv("PATH", saved)
+    check r.isErr
+    check r.error.kind == ekTool
+    check "wasm-component-ld" in r.error.msg
+
+  test "Given a sysroot without lib/wasm32-wasip3, When the wasip3 toolchain is looked for, Then it is refused naming that directory":
+    let d = freshDir("wasm-p3-sysroot")
+    writeTree(d, {"lib/wasm32-wasip1/libc.a": "!<arch>\n"})
+    let r = findWasmToolchain(DefaultLlvmBin, d, false, target = wtWasip3)
+    check r.isErr
+    check r.error.kind == ekTool
+    check "lib/wasm32-wasip3" in r.error.msg
+
+  test "Given the wasip3 target and the component shape, When built, Then it is refused as a usage error":
+    let d = probeDir("wasm-p3-component")
+    var tc = p3Toolchain()
+    tc.wasmTools = findExe("wasm-tools")
+    let r = buildWasm(tc, componentRequest(d / "prog" / "main.nim", d))
+    check r.isErr
+    check r.error.kind == ekUsage
+    check "wasm32-wasip3" in r.error.msg
+
+suite "NIV-60 the 128-bit multiply for wasip3":
+  test "Given clang's resource directory in each wasip3 layout, When looked into, Then the wasm32 compiler-rt is found, and a wasip1 one is not taken":
+    for rel in compilerRtCandidates(wtWasip3):
+      let d = freshDir("wasm-p3-rt")
+      writeTree(d, {rel: "!<arch>\n"})
+      check compilerRtIn(d, wtWasip3) == d / rel
+    let p1Only = freshDir("wasm-p3-rt-p1")
+    writeTree(p1Only, {CompilerRtCandidates[0]: "!<arch>\n"})
+    check compilerRtIn(p1Only, wtWasip3) == ""
+    check compilerRtCandidates(wtWasip1) == @CompilerRtCandidates
+
+  test "Given no compiler-rt, When a program multiplies 128-bit numbers for wasip3, Then niuv's shim gives the right products":
+    let d = freshDir("wasm-p3-multi3")
+    writeTree(d, {"main.nim": multiplyProgram})
+    var tc = p3Toolchain()
+    tc.compilerRt = ""
+    let built = buildWasm(tc, request(d / "main.nim", d))
+    check built.isOk
+    check built.get.builtins == bkMulti3Shim
+    let (o, code) = runP3(built.get.wasm)
+    check code == 0
+    check o.splitLines()[0 .. 2] == @["fffffffffffffffe0000000000000001",
+                                       "0111111111111110fedcba9876543210",
+                                       "00000000000000000000000000000001"]
+
+suite "NIV-61 niuv wasm --target on the command line":
+  test "Given --target wasm32-wasip3 without --out, When run, Then the component goes to build/wasm32-wasip3 next to the program and runs":
+    let d = freshDir("wasm-p3-cli")
+    writeTree(d, {"hello.nim": "echo \"p3 cli ok\"\n"})
+    let r = runCli(@["wasm", d / "hello.nim", "--target", "wasm32-wasip3", "--stage", d / "s"])
+    check r.code == 0
+    let wasm = d / "build" / "wasm32-wasip3" / "hello.wasm"
+    check ("wasm " & wasm) in r.stdout
+    check runP3(wasm)[0].strip() == "p3 cli ok"
+
+  test "Given --target wasm32-wasip1 or no --target, When run, Then the preview1 command is built as before":
+    let d = freshDir("wasm-p1-cli-target")
+    writeTree(d, {"hello.nim": "echo \"p1 ok\"\n"})
+    let r = runCli(@["wasm", d / "hello.nim", "--target", "wasm32-wasip1", "--stage", d / "s"])
+    check r.code == 0
+    check run(d / "build" / "wasm32-wasip1" / "hello.wasm")[0].strip() == "p1 ok"
+
+  test "Given an unknown target, or wasip3 with --component, When run, Then each is refused with the usage":
+    let unknown = runCli(@["wasm", "x.nim", "--target", "wasm32-wasip2"])
+    check unknown.code == 2
+    check "--target takes wasm32-wasip1 or wasm32-wasip3" in unknown.stderr
+    let withComponent = runCli(@["wasm", "x.nim", "--target", "wasm32-wasip3", "--component", "w",
+                                 "--world", "a/b", "--export", "run"])
+    check withComponent.code == 2
+    check "--component is for wasm32-wasip1" in withComponent.stderr
+    check "--target" in runCli(@["--help"]).stdout
+
+suite "NIV-62 --aot for wasip3":
+  test "Given --aot and the wasip3 target, When built, Then the out directory holds the .wasm and the .cwasm, and the .cwasm runs precompiled":
+    let d = freshDir("wasm-p3-aot")
+    writeTree(d, {"main.nim": "echo \"p3 aot ok\"\n"})
+    let built = buildWasm(p3Toolchain(aot = true), request(d / "main.nim", d, aot = true))
+    check built.isOk
+    var names: seq[string]
+    for _, f in walkDir(d / "out"): names.add f.extractFilename
+    check names.len == 2 and "prog.wasm" in names and "prog.cwasm" in names
+    let (o, code) = runP3(built.get.cwasm, precompiled = true)
+    check code == 0
+    check "p3 aot ok" in o

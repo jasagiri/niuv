@@ -21,6 +21,8 @@ commands:
                             wasi-sysroot and wasm-tools: [--llvm DIR] [--sysroot DIR] as for wasm)
   child                     serve one build request on frames (for the key keeper's children)
   wasm <program.nim>        build one Nim program as a wasm32-wasip1 command module (not locked)
+                            [--target wasm32-wasip1|wasm32-wasip3]  wasip3: a WASI 0.3 command component
+                              (needs wasm-component-ld on PATH; --out defaults to build/<target>)
                             [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
                             [--llvm DIR] [--sysroot DIR] [--stack-size BYTES]  (default 8 MiB; 64 KiB..64 MiB)
                             [--component WIT-DIR --world PKG/WORLD --export NAME...]  a component of a WIT world
@@ -249,22 +251,29 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
 
 proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
   let p = parseArgs(args, ["--out", "--name", "--stage", "--nim-flag", "--llvm", "--sysroot",
-                           "--component", "--world", "--export", "--adapter", "--stack-size"], ["--no-simd", "--aot", "--wasi"])
+                           "--component", "--world", "--export", "--adapter", "--stack-size", "--target"],
+                    ["--no-simd", "--aot", "--wasi"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len != 1: return usageFail("wasm needs one Nim program")
   let last = proc (name, default: string): string =
     let given = p.get.opts.getOrDefault(name)
     if given.len > 0: given[^1] else: default
+  var target: WasmTarget
+  case last("--target", $wtWasip1)
+  of $wtWasip1: target = wtWasip1
+  of $wtWasip3: target = wtWasip3
+  else: return usageFail("--target takes wasm32-wasip1 or wasm32-wasip3")
   var program, outDir: string
   try:
     program = normalizedPath(absolutePath(p.get.positional[0]))
-    outDir = normalizedPath(absolutePath(last("--out", program.parentDir / "build" / Wasm32Wasip1)))
+    outDir = normalizedPath(absolutePath(last("--out", program.parentDir / "build" / $target)))
   except CatchableError as e:
     return fail(e.msg)
   let name = last("--name", program.extractFilename.changeFileExt(""))
   let aot = p.get.opts.hasKey("--aot")
   let component = p.get.opts.hasKey("--component")
   if component:
+    if target != wtWasip1: return usageFail("--component is for wasm32-wasip1 (a wasm32-wasip3 command is already a component)")
     if aot: return usageFail("--aot is for command modules, not --component")
     if not p.get.opts.hasKey("--world"): return usageFail("--component needs --world")
     if not p.get.opts.hasKey("--export") and not p.get.opts.hasKey("--wasi"):
@@ -290,7 +299,8 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
       return usageFail("--stack-size takes a number of bytes")
     if not stackSizeValid(stackSize):
       return usageFail("--stack-size takes 65536 to 67108864 bytes, a multiple of 16")
-  let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot, component)
+  let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot, component,
+                             target)
   if tc.isErr: return fail($tc.error)
   let req = WasmRequest(program: program, outDir: outDir, name: name,
                         stageDir: stageFor(last("--stage", defaultStageRoot()), outDir, name),

@@ -95,3 +95,13 @@
 | NIV-55 | tests/unit/test_inbuilder.nim: `Given a package that declares a wasm component ... (NIV-55)`（macOS のホストだけ。Linux のホストは NIV-27 の builderHost が先に断る） | あり |
 | NIV-56 | tests/unit/test_wasmbuild.nim: `NIV-56 the closure reaches the component` | あり |
 | NIV-57 | tests/unit/test_wasmbuild.nim: `NIV-57 the lock covers what the component reads` | あり |
+
+## ADR-NIUV-0008（WASI 0.3 の command の component）
+
+| 規則 | E テスト（ファイル: suite 名） | 状態 |
+|---|---|---|
+| NIV-58 | tests/unit/test_wasm.nim: `NIV-58 a WASI 0.3 command`（clang の旗、component が `wasi:cli/run@0.3.0` を export、引数と結果の終了コード、preopen の読み書きと見せない環境変数、std/unittest の失敗で 0 でない） | あり |
+| NIV-59 | tests/unit/test_wasm.nim: `NIV-59 the component linker`（`-fuse-ld` に見つけた wasm-component-ld、PATH に無ければ名前で断る、`lib/wasm32-wasip3` の無い sysroot を断る、component の形と組まない） | あり |
+| NIV-60 | tests/unit/test_wasm.nim: `NIV-60 the 128-bit multiply for wasip3`（wasip3 の置き方で見つけ、wasip1 のものは使わない、写しで正しい積） | あり |
+| NIV-61 | tests/unit/test_wasm.nim: `NIV-61 niuv wasm --target on the command line`（既定の置き場 `build/wasm32-wasip3`、`--target wasm32-wasip1`、知らない対象と `--component` を断る、help） | あり |
+| NIV-62 | tests/unit/test_wasm.nim: `NIV-62 --aot for wasip3`（出力先は .wasm と .cwasm だけ、.cwasm が走る） | あり |

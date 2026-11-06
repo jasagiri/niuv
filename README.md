@@ -54,6 +54,7 @@ niuv build <package> [--out DIR] [--bin NAME]... [--stage DIR]
 niuv child                                   # nim-frames の枠で 1 つのビルドの頼みを受ける（腐海の子）
 niuv --version [--check]                     # 版と、組んだソースの指紋（--check: 終了の値 0 一致・3 古い・4 ソースが無い）。ソースが後で変わっていれば、ほかのコマンドは作り直しを求めて断る（ADR-NIUV-0005）
 niuv wasm <program.nim> [--out DIR] [--aot] [--nim-flag F]... [--no-simd]   # 1 つの Nim のプログラムを wasm32-wasip1 に組む（宣言・ロックなし）
+niuv wasm <program.nim> --target wasm32-wasip3 [--out DIR] [--aot]   # WASI 0.3 の command の component に組む（ADR-NIUV-0008。wasm-component-ld が要る）
 niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --export NAME... [--out DIR]   # WIT の world の component に組む（ADR-NIUV-0004）
 niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --wasi [--adapter FILE]       # WASI 0.3 を import する world: wasip1 の reactor に adapter を付ける
 
@@ -64,7 +65,7 @@ niuv build <package> --target aarch64-linux-musl --in-builder --out DIR [--signa
 
 `niuv build` は `niuv.toml` の `[[wasm.component]]`（`name`・`entry`・`wit`・`world`・`export`、省略可に `stack_size`・`paths`・`flags`・`no_simd`・`sealed`）を、下の `niuv wasm --component` と同じ手順で組み、`<out>/wasm/<name>.component.wasm` だけを出力先に置いて、目録に `wasm` の成果物として載せる（[ADR-NIUV-0007](docs/adr/ADR-NIUV-0007-wasm-components-in-the-build.md)、NIV-49〜57。`--bin` で名前を選べる。clang・wasi-sysroot・wasm-tools が要り、Linux のビルド用の像の中では組まない）。
 
-`niuv wasm` は Nim のプログラムを wasm32-wasip1 のコマンドのモジュールに組む、ただ 1 つの手順（[ADR-NIUV-0003](docs/adr/ADR-NIUV-0003-wasm32-wasip1.md)、NIV-34〜39）。テストの task やベンチはこれを呼び、自前の `build.sh` を持たない。Homebrew の llvm には wasm32 の compiler-rt が無いので、`__multi3` は niuv の写しをリンクし、その旨を注に出す（`brew install wasi-runtimes` を入れるかは代表が決める）。
+`niuv wasm` は Nim のプログラムを wasm32-wasip1 のコマンドのモジュールに組む、ただ 1 つの手順（[ADR-NIUV-0003](docs/adr/ADR-NIUV-0003-wasm32-wasip1.md)、NIV-34〜39）。テストの task やベンチはこれを呼び、自前の `build.sh` を持たない。 `--target wasm32-wasip3` では、wasi-libc の wasip3 と `wasm-component-ld` で WASI 0.3 の `wasi:cli/command` の component を組む（[ADR-NIUV-0008](docs/adr/ADR-NIUV-0008-wasm32-wasip3-command.md)、NIV-58〜62。nim-wasm-runtime と wasmtime の `-S p3` で走る）。Homebrew の llvm には wasm32 の compiler-rt が無いので、`__multi3` は niuv の写しをリンクし、その旨を注に出す（`brew install wasi-runtimes` を入れるかは代表が決める）。
 
 `build` はロックが無い・古い、ツールの版か実行ファイルがロックと違う、閉包に同じ外の依存が 2 つの版で来る、のどれかで断る。出力先には成果物と `niuv.manifest.cbor`、`niuv.sbom.cdx.json` だけが置かれ、コンパイラの作業場（nimcache）と Gleam の写しは置き場の根（`--stage`、既定は一時ディレクトリの `niuv-stage`）の下に置かれる。
 

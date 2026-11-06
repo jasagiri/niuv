@@ -44,3 +44,8 @@
 
 - NIV-34 の C の旗: Nim の生成する C を `-w`（clang の警告を全部黙らせる。Nim が自分で clang に渡す旗）で組んでいたのを、`-Werror` に改め、リンクに `-Wl,--fatal-warnings` を足した（司会の指示: 警告を抑えない決まり）。`-w` を外して clang の既定の水準で数えると、使い手のプログラム（社内の描画器 の tests 7 本、nim-opentype の tests/external 8 本、nim-png の tests 2 本、社内のブラウザのシェル の shell_bench、社内の OS の desktop_probe）の生成した C 905 ファイルで警告は 0 だった。だから外す警告の名前は無く、新しく出た警告はビルドを落とす（成功したビルドの clang の出力は読まれずに捨てられるので、黙って流すのと同じになるため）。
 - `-Wall -Wextra` は足さない（Nim も足さない）。足すと同じ 905 ファイルで 6 種類が出る: `-Wunused-but-set-variable` 1530、`-Wsometimes-uninitialized` 1300、`-Wunused-parameter` 607、`-Wcast-function-type-mismatch` 347、`-Wunused-label` 127、`-Wself-assign` 19。どれも Nim の生成する C の形（使わない一時変数、goto の例外の口、関数の型の写し）で、直す場所は Nim の上流にある。niuv の `start.c` と `multi3.c` は従来どおり `-Wall -Wextra -Werror` で組む。
+
+## 訂正 (2026-11-07)
+
+- 一部を ADR-NIUV-0008 で改めた: `niuv wasm` は `--target wasm32-wasip3` で WASI 0.3 の command の component も組む (NIV-58〜62)。`--target` の既定は `wasm32-wasip1` で、この ADR の規則はそのまま。NIV-38 の「`lib/wasm32-wasip1` が無い」は、選んだ対象の `lib/<target>` で確かめる形になった。NIV-39 の `--out` の既定は `build/<target>`。
+- NIV-35 の `start.c`: 0 でない `programResult` を `return` ではなく `exit()` で返す形に改めた (ADR-NIUV-0008 の NIV-58)。wasip1 の `_start` は main の戻り値で同じ `exit` を呼ぶので、wasip1 の終了コードは変わらない (NIV-35 の E テストで確かめた)。

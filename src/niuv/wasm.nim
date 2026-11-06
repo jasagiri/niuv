@@ -52,6 +52,11 @@ const
     "lib/wasi/libclang_rt.builtins-wasm32.a"]
     ## Where clang's resource directory keeps a wasm32 compiler-rt, in the
     ## layouts of LLVM's per-target runtimes and of wasi-sdk.
+  CompilerRtCandidatesWasip3* = [
+    "lib/wasm32-unknown-wasip3/libclang_rt.builtins.a",
+    "lib/wasip3/libclang_rt.builtins-wasm32.a"]
+    ## The same two layouts for wasm32-wasip3 (NIV-60). wasi-sdk's `lib/wasi`
+    ## is preview1's; a wasip1 compiler-rt is not taken for wasip3.
   MaxCompilerOutput = 8192
   DefaultAdapter* = currentSourcePath().parentDir.parentDir.parentDir.parentDir /
     "nim-wasip1-adapter" / "build" / "reactor" / "wasi_snapshot_preview1.wasm"
@@ -59,6 +64,10 @@ const
     ## built by its scripts/build-adapter.sh (build/ is not committed).
 
 type
+  WasmTarget* = enum
+    wtWasip1 = "wasm32-wasip1"  ## a preview1 command module; NIV-34
+    wtWasip3 = "wasm32-wasip3"  ## a WASI 0.3 command component, through wasi-libc's wasip3; NIV-58
+
   WasmShape* = enum
     wsCommand     ## a WASI command module (_start); NIV-34
     wsComponent   ## a component of a WIT world; NIV-40
@@ -68,7 +77,9 @@ type
     bkMulti3Shim    ## niuv's own __multi3 (multi3.c): no compiler-rt was found
 
   WasmToolchain* = object
+    target*: WasmTarget      ## what clang is asked to build for
     nim*, clang*, sysroot*: string
+    componentLd*: string     ## wtWasip3: the wasm-component-ld clang links with (NIV-59)
     wasmtime*: string        ## "" when no AOT step was asked for
     wasmTools*: string       ## "" unless a component is built
     compilerRt*: string      ## "" when clang has none for wasm32
@@ -94,8 +105,8 @@ type
     builtins*: BuiltinsKind
     notes*: seq[string]
 
-proc targetCFlags*(sysroot: string, simd: bool): seq[string] {.raises: [].} =
-  result = @["--target=" & Wasm32Wasip1, "--sysroot=" & sysroot, "-O2"]
+proc targetCFlags*(sysroot: string, simd: bool, target = wtWasip1): seq[string] {.raises: [].} =
+  result = @["--target=" & $target, "--sysroot=" & sysroot, "-O2"]
   if simd: result.add "-msimd128"
 
 proc nimArgs*(req: WasmRequest, nimcache: string): seq[string] {.raises: [].} =
@@ -107,10 +118,10 @@ proc nimCArgs*(tc: WasmToolchain, simd: bool, nimLib, cFile, oFile: string): seq
   ## Not -w, which Nim itself passes to clang: at clang's default warning
   ## level Nim's C for wasm32 gives no warning (NIV-34), so any warning is new
   ## and fails the build rather than vanishing into a log nobody reads.
-  targetCFlags(tc.sysroot, simd) & @["-Werror", "-I" & nimLib, "-c", cFile, "-o", oFile]
+  targetCFlags(tc.sysroot, simd, tc.target) & @["-Werror", "-I" & nimLib, "-c", cFile, "-o", oFile]
 
 proc ownCArgs*(tc: WasmToolchain, simd: bool, cFile, oFile: string): seq[string] {.raises: [].} =
-  targetCFlags(tc.sysroot, simd) & @["-Wall", "-Wextra", "-Werror", "-c", cFile, "-o", oFile]
+  targetCFlags(tc.sysroot, simd, tc.target) & @["-Wall", "-Wextra", "-Werror", "-c", cFile, "-o", oFile]
 
 proc stackSizeValid*(bytes: int): bool {.raises: [].} =
   ## NIV-48: a stack from 64 KiB to 64 MiB, a multiple of 16 (the wasm32 stack alignment).
@@ -118,9 +129,15 @@ proc stackSizeValid*(bytes: int): bool {.raises: [].} =
 
 proc linkArgs*(tc: WasmToolchain, simd: bool, objects: seq[string], builtins, outFile: string,
                stackSize = StackSize): seq[string] {.raises: [].} =
-  targetCFlags(tc.sysroot, simd) &
-    @["-nodefaultlibs", "-Wl,--fatal-warnings", "-Wl,--max-memory=" & $MaxMemory, "-Wl,-z,stack-size=" & $stackSize] &
-    objects & @["-lc", builtins, "-o", outFile]
+  ## For wasip3, clang's driver links through wasm-component-ld, which runs
+  ## wasm-ld and makes the component; the one the toolchain found is named, so
+  ## clang does not pick another from its own search (NIV-59).
+  result = targetCFlags(tc.sysroot, simd, tc.target)
+  if tc.target == wtWasip3: result.add "-fuse-ld=" & tc.componentLd
+  result.add @["-nodefaultlibs", "-Wl,--fatal-warnings", "-Wl,--max-memory=" & $MaxMemory,
+               "-Wl,-z,stack-size=" & $stackSize]
+  result.add objects
+  result.add @["-lc", builtins, "-o", outFile]
 
 proc componentLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[string],
                         builtins, outFile: string, stackSize = StackSize): seq[string] {.raises: [].} =
@@ -141,9 +158,14 @@ proc reactorLinkArgs*(tc: WasmToolchain, simd: bool, objects, exports: seq[strin
   result.add objects
   result.add @["-lc", builtins, "-o", outFile]
 
-proc compilerRtIn*(resourceDir: string): string {.raises: [].} =
-  ## The wasm32 compiler-rt under clang's resource directory, or "".
-  for rel in CompilerRtCandidates:
+proc compilerRtCandidates*(target: WasmTarget): seq[string] {.raises: [].} =
+  case target
+  of wtWasip1: @CompilerRtCandidates
+  of wtWasip3: @CompilerRtCandidatesWasip3
+
+proc compilerRtIn*(resourceDir: string, target = wtWasip1): string {.raises: [].} =
+  ## The wasm32 compiler-rt for `target` under clang's resource directory, or "".
+  for rel in compilerRtCandidates(target):
     if fileExists(resourceDir / rel): return resourceDir / rel
   ""
 
@@ -163,24 +185,31 @@ proc onPath(name: string): NResult[string] {.raises: [].} =
   ok(found)
 
 proc findWasmToolchain*(llvmBin, sysroot: string, aot: bool,
-                        component = false): NResult[WasmToolchain] {.raises: [].} =
-  ## The tools of a wasm32-wasip1 build. Each one that is missing is refused
+                        component = false, target = wtWasip1): NResult[WasmToolchain] {.raises: [].} =
+  ## The tools of a build for `target`. Each one that is missing is refused
   ## by name; none is installed or fetched.
-  var tc = WasmToolchain(sysroot: sysroot)
+  var tc = WasmToolchain(target: target, sysroot: sysroot)
   tc.nim = ?onPath("nim")
   tc.clang = llvmBin / "clang"
   if not fileExists(tc.clang):
-    return toolErr[WasmToolchain](tc.clang & " does not exist: wasm32-wasip1 needs LLVM's clang (--llvm DIR)")
-  if not dirExists(sysroot / "lib" / Wasm32Wasip1):
-    return toolErr[WasmToolchain](sysroot & " is not a wasi-sysroot (no lib/" & Wasm32Wasip1 & "; --sysroot DIR)")
+    return toolErr[WasmToolchain](tc.clang & " does not exist: " & $target & " needs LLVM's clang (--llvm DIR)")
+  if not dirExists(sysroot / "lib" / $target):
+    return toolErr[WasmToolchain](sysroot & " is not a wasi-sysroot for " & $target & " (no lib/" & $target &
+                                  "; --sysroot DIR)")
+  if target == wtWasip3:
+    let found = onPath("wasm-component-ld")
+    if found.isErr:
+      return toolErr[WasmToolchain]("wasm-component-ld is not on PATH: " & $target &
+                                    " links through it (cargo install wasm-component-ld --locked)")
+    tc.componentLd = found.get
   if aot:
     tc.wasmtime = ?onPath("wasmtime")
   if component:
     tc.wasmTools = ?onPath("wasm-tools")
-  let r = ?runProcess(tc.clang, @["--target=" & Wasm32Wasip1, "-print-resource-dir"])
+  let r = ?runProcess(tc.clang, @["--target=" & $target, "-print-resource-dir"])
   if r.code != 0:
     return toolErr[WasmToolchain](tc.clang & " -print-resource-dir failed:\n" & tail(r.output, MaxCompilerOutput))
-  tc.compilerRt = compilerRtIn(r.output.strip())
+  tc.compilerRt = compilerRtIn(r.output.strip(), target)
   ok(tc)
 
 proc nimLibDir(tc: WasmToolchain, program: string): NResult[string] {.raises: [].} =
@@ -261,6 +290,9 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
   if not stackSizeValid(stack):
     return err(niuvError(ekUsage, "a stack of " & $stack & " bytes: give 65536 to 67108864, a multiple of 16"))
   if req.shape == wsComponent:
+    if tc.target != wtWasip1:
+      return err(niuvError(ekUsage, "a component of a world is built for wasm32-wasip1; a " & $tc.target &
+                           " command is already a component"))
     if req.world.len == 0:
       return err(niuvError(ekUsage, "a component needs a world"))
     if req.adapter.len == 0 and req.exports.len == 0:
