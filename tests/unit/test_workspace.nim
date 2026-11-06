@@ -81,10 +81,40 @@ suite "NIV-07 workspace":
     writeTree(d, {"a/niuv.toml": pkgToml("alpha", "\n[gleam]\n")})
     check loadWorkspace(wsFile(d, "[workspace]\nmembers = [\"a\"]\n")).isErr
 
-  test "Given a wasm entry that is missing, When loaded, Then it is refused":
-    let d = freshDir("ws-nowasm")
-    writeTree(d, {"a/niuv.toml": pkgToml("alpha", "\n[wasm]\nentry = \"m.wat\"\n")})
+  test "Given a wasm component whose entry, wit or path is missing, When loaded, Then it is refused naming it (NIV-50)":
+    let comp = "\n[[wasm.component]]\nname = \"p\"\nentry = \"g/main.nim\"\nwit = \"wit\"\nworld = \"a:b/c\"\nexport = [\"run\"]\n"
+    let full = {"a/g/main.nim": "discard", "a/wit/p.wit": "package a:b;"}
+    for (what, missing) in [("entry", "a/g/main.nim"), ("wit", "a/wit/p.wit")]:
+      let d = freshDir("ws-nowasm-" & what)
+      writeTree(d, {"a/niuv.toml": pkgToml("alpha", comp)})
+      for (rel, content) in full:
+        if rel != missing: writeTree(d, {rel: content})
+      let ws = loadWorkspace(wsFile(d, "[workspace]\nmembers = [\"a\"]\n"))
+      check ws.isErr
+      check ws.error.kind == ekWorkspace
+      check "'p'" in ws.error.msg
+    let d = freshDir("ws-nowasm-path")
+    writeTree(d, {"a/niuv.toml": pkgToml("alpha", comp & "paths = [\"sdk\"]\n"), "a/g/main.nim": "discard",
+                  "a/wit/p.wit": "package a:b;"})
     check loadWorkspace(wsFile(d, "[workspace]\nmembers = [\"a\"]\n")).isErr
+
+  test "Given a wasm component path that leaves the workspace, When loaded, Then it is refused (NIV-50)":
+    let d = freshDir("ws-wasm-outside")
+    writeTree(d / "w", {"a/niuv.toml": pkgToml("alpha",
+      "\n[[wasm.component]]\nname = \"p\"\nentry = \"g/main.nim\"\nwit = \"wit\"\nworld = \"a:b/c\"\n" &
+      "export = [\"run\"]\npaths = [\"../../../sdk\"]\n"),
+      "a/g/main.nim": "discard", "a/wit/p.wit": "package a:b;"})
+    let ws = loadWorkspace(wsFile(d / "w", "[workspace]\nmembers = [\"a\"]\n"))
+    check ws.isErr
+    check "leaves the workspace" in ws.error.msg
+
+  test "Given a wasm component path in a sibling directory of the package inside the workspace, When loaded, Then it is accepted":
+    let d = freshDir("ws-wasm-sibling")
+    writeTree(d, {"a/niuv.toml": pkgToml("alpha",
+      "\n[[wasm.component]]\nname = \"p\"\nentry = \"g/main.nim\"\nwit = \"wit\"\nworld = \"a:b/c\"\n" &
+      "export = [\"run\"]\npaths = [\"../sdk/src\"]\n"),
+      "a/g/main.nim": "discard", "a/wit/p.wit": "package a:b;", "sdk/src/x.nim": "discard"})
+    check loadWorkspace(wsFile(d, "[workspace]\nmembers = [\"a\"]\n")).isOk
 
   test "Given tool pins, When loaded, Then they are read":
     let d = freshDir("ws-tools")

@@ -7,7 +7,7 @@
 | NIV-01 | tests/unit/test_decl.nim: `NIV-01 package table` | あり（N1） |
 | NIV-02 | tests/unit/test_decl.nim: `NIV-02 nim table` | あり（N1） |
 | NIV-03 | tests/unit/test_decl.nim: `NIV-03 gleam table` | あり（N1） |
-| NIV-04 | tests/unit/test_decl.nim: `NIV-04 wasm table`、tests/unit/test_cli.nim: `NIV-04 wasm is declared, not built` | あり（N1） |
+| NIV-04 | tests/unit/test_decl.nim: `NIV-04` の旧い形は ADR-NIUV-0007 で NIV-49 に置き換えた（旧い `entry` の形を断る: `NIV-49 wasm components`） | 置き換え（ADR-NIUV-0007） |
 | NIV-05 | tests/unit/test_decl.nim: `NIV-05 dependencies` | あり（N1） |
 | NIV-06 | tests/unit/test_decl.nim: `NIV-06 package root` | あり（N1） |
 | NIV-07 | tests/unit/test_workspace.nim: `NIV-07 workspace` | あり（N1） |
@@ -81,3 +81,17 @@
 |---|---|---|
 | NIV-46 | tests/unit/test_fingerprint.nim: `NIV-46 the fingerprint of niuv's sources` | あり |
 | NIV-47 | tests/unit/test_fingerprint.nim: `NIV-47 the exit code of niuv --version --check`、`NIV-46` の suite（断るコマンドが 3） | あり |
+
+## ADR-NIUV-0007（プロジェクトのビルドで WASM の component を組む）
+
+| 規則 | E テスト（ファイル: suite 名） | 状態 |
+|---|---|---|
+| NIV-49 | tests/unit/test_decl.nim: `NIV-49 wasm components`（全部の鍵、必須の鍵ごとの断り、旧い `entry` の形と空の `[wasm]`、知らない鍵、名前の重なり、stack_size の範囲） | あり |
+| NIV-50 | tests/unit/test_decl.nim: `NIV-50 component paths are relative`、tests/unit/test_workspace.nim: `NIV-07 workspace`（entry・wit・paths が無い、作業場の外へ出る、兄弟の package は受ける） | あり |
+| NIV-51 | tests/unit/test_wasmbuild.nim: `NIV-51 ...`（component を実行、目録の SHA-256 とファイルが一致、出力先は component だけ、2 回で同じ、失敗に名前、stack）、tests/unit/test_cli.nim: `NIV-51 a component beside the other kinds` | あり |
+| NIV-52 | tests/unit/test_wasmbuild.nim: `NIV-52 ...`（clang・sysroot・wasm-tools の断りと、component の無い package は要さない） | あり |
+| NIV-53 | tests/unit/test_wasmbuild.nim: `NIV-53 --bin selects components too` | あり |
+| NIV-54 | tests/unit/test_wasmbuild.nim: `NIV-54 the license gate covers a sealed component` | あり |
+| NIV-55 | tests/unit/test_inbuilder.nim: `Given a package that declares a wasm component ... (NIV-55)`（macOS のホストだけ。Linux のホストは NIV-27 の builderHost が先に断る） | あり |
+| NIV-56 | tests/unit/test_wasmbuild.nim: `NIV-56 the closure reaches the component` | あり |
+| NIV-57 | tests/unit/test_wasmbuild.nim: `NIV-57 the lock covers what the component reads` | あり |

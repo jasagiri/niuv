@@ -17,6 +17,8 @@ commands:
   lock                      pin tools, packages and external dependencies (writes niuv.lock, or niuv.<target>.lock)
   check <package>           resolve the closure of a package and list it
   build <package>           build the package's artifacts [--out DIR] [--bin NAME]... [--stage DIR]
+                            (--bin names a nim bin or a wasm component; components need clang, the
+                            wasi-sysroot and wasm-tools: [--llvm DIR] [--sysroot DIR] as for wasm)
   child                     serve one build request on frames (for the key keeper's children)
   wasm <program.nim>        build one Nim program as a wasm32-wasip1 command module (not locked)
                             [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
@@ -198,7 +200,7 @@ proc cmdCheck(args: seq[string]): CliResult {.raises: [].} =
   CliResult(stdout: o)
 
 proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
-  let p = parseArgs(args, @["--workspace", "--out", "--bin", "--stage", "--target"] & @GuestOptions & @["--external-root"],
+  let p = parseArgs(args, @["--workspace", "--out", "--bin", "--stage", "--target", "--llvm", "--sysroot"] & @GuestOptions & @["--external-root"],
                     ["--in-builder", "--in-guest"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len != 1: return usageFail("build needs one package name")
@@ -208,6 +210,9 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
   let ws = openWorkspace(p.get, m)
   if ws.isErr: return fail($ws.error)
   let package = p.get.positional[0]
+  let lastOpt = proc (name, default: string): string =
+    let given = p.get.opts.getOrDefault(name)
+    if given.len > 0: given[^1] else: default
   let outGiven = p.get.opts.getOrDefault("--out")
   var outDir = ws.get.dir / "build" / "niuv" / package
   if outGiven.len > 0:
@@ -227,7 +232,8 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
     manifestPath = r.get.outcome.manifestPath
     sbomPath = r.get.outcome.sbomPath
   else:
-    let r = buildPackage(ws.get, package, outDir, stageRoot, p.get.opts.getOrDefault("--bin"), m.target, m.inGuest)
+    let r = buildPackage(ws.get, package, outDir, stageRoot, p.get.opts.getOrDefault("--bin"), m.target, m.inGuest,
+                          lastOpt("--llvm", DefaultLlvmBin), lastOpt("--sysroot", DefaultWasiSysroot))
     if r.isErr: return fail($r.error)
     artifacts = r.get.artifacts
     notes = r.get.notes

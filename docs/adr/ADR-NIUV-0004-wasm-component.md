@@ -44,3 +44,7 @@ stack の大きさ（2026-11-05 に足した。nim-actor-guest の報告: 8 MiB 
 
 - 「採らなかった案」の「Nim を `--os:linux` のまま component にする」が退けたのは、example:desktop だけの world に WASI を持ち込むことである。WASI 0.3 を import する world には、wasip1 で組み、preview1 → WASI 0.3 の adapter を付けた形を使う（司会の決定、W4 の案 A）。その形の規則は NIV-44 以降に足す。
 - NIV-42 の「world の外（WASI など）を import する core を断る」は、freestanding の形（`--adapter` の無い `--component`）だけに効く。adapter を付けた形の core は wasi_snapshot_preview1 を import し、adapter がそれを WASI 0.3 に写す。
+
+## 訂正 (2026-11-06)
+
+- 手順を呼ぶのは `niuv wasm` だけではなくなった。`niuv build` が、`niuv.toml` の `[[wasm.component]]` を同じ `buildWasm` で組む（ADR-NIUV-0007、NIV-49〜57）。NIV-40〜43、48 の規則は変えない。

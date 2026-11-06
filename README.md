@@ -40,8 +40,8 @@ niuv は **ビルド** だけを受け持つ。**配る**（公開、鍵の付�
 
 | 約束 | 規則 | 使い手 |
 |---|---|---|
-| 目録 `niuv.manifest.cbor`: 成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`）・SHA-256・大きさ。場所は載せない。署名しない。形式の版 2（NIV-29）は目標（`aarch64-linux-musl` など）と、beam を作った OTP の版（beam が無ければ空）も載せる。版 1 も読む（目標・OTP は不明） | NIV-18、NIV-29 | delivery は Nim から `niuv/manifest` を読み、目録から署名する頭を作る（目録そのものは署名しない。平文の SHA-256 を頭に出さないため）。版 1 と版 2 のどちらの目録も封じられる |
-| 置き場: Nim の実行ファイルは `<out>/<bin 名>`、Gleam の `.beam` は `<out>/beam/<アプリ>/<モジュール>.beam` | NIV-15、NIV-23 | delivery は目録の名前と SHA-256 で成果物を探して照らす |
+| 目録 `niuv.manifest.cbor`: 成果物ごとに名前・種類（`beam` / `nim-child` / `wasm`。`wasm` は NIV-51 の component）・SHA-256・大きさ。場所は載せない。署名しない。形式の版 2（NIV-29）は目標（`aarch64-linux-musl` など）と、beam を作った OTP の版（beam が無ければ空）も載せる。版 1 も読む（目標・OTP は不明） | NIV-18、NIV-29 | delivery は Nim から `niuv/manifest` を読み、目録から署名する頭を作る（目録そのものは署名しない。平文の SHA-256 を頭に出さないため）。版 1 と版 2 のどちらの目録も封じられる |
+| 置き場: Nim の実行ファイルは `<out>/<bin 名>`、WASM の component は `<out>/wasm/<名前>.component.wasm`（NIV-51）、Gleam の `.beam` は `<out>/beam/<アプリ>/<モジュール>.beam` | NIV-15、NIV-23 | delivery は目録の名前と SHA-256 で成果物を探して照らす |
 | 決まったバイト列: 同じ入力からは、置いた場所によらず同じ `.beam` | NIV-17 | 版の差分（変わったモジュールだけを取る）が成り立つ前提 |
 | 腐海の Nim の子としての入口: `niuv child` は nim-frames の枠で 1 つのビルドの頼みを受け、目録のバイト列を返す | NIV-21 | delivery の公開のエージェントが `niuv child` を子として起こし、ビルドを頼む（ロックは人か試験が `niuv lock` で作る） |
 
@@ -61,6 +61,8 @@ niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --wasi [--adapter 
 niuv lock  --target aarch64-linux-musl --in-builder --builder NAME@sha256:<digest> [--repin-builder] [ゲストの旗]  # ロックが別の像を pin していれば、--repin-builder が要る
 niuv build <package> --target aarch64-linux-musl --in-builder --out DIR [--signature FILE] [--hex-cache DIR] [ゲストの旗]
 ```
+
+`niuv build` は `niuv.toml` の `[[wasm.component]]`（`name`・`entry`・`wit`・`world`・`export`、省略可に `stack_size`・`paths`・`flags`・`no_simd`・`sealed`）を、下の `niuv wasm --component` と同じ手順で組み、`<out>/wasm/<name>.component.wasm` だけを出力先に置いて、目録に `wasm` の成果物として載せる（[ADR-NIUV-0007](docs/adr/ADR-NIUV-0007-wasm-components-in-the-build.md)、NIV-49〜57。`--bin` で名前を選べる。clang・wasi-sysroot・wasm-tools が要り、Linux のビルド用の像の中では組まない）。
 
 `niuv wasm` は Nim のプログラムを wasm32-wasip1 のコマンドのモジュールに組む、ただ 1 つの手順（[ADR-NIUV-0003](docs/adr/ADR-NIUV-0003-wasm32-wasip1.md)、NIV-34〜39）。テストの task やベンチはこれを呼び、自前の `build.sh` を持たない。Homebrew の llvm には wasm32 の compiler-rt が無いので、`__multi3` は niuv の写しをリンクし、その旨を注に出す（`brew install wasi-runtimes` を入れるかは代表が決める）。
 
@@ -85,6 +87,6 @@ niuv build <package> --target aarch64-linux-musl --in-builder --out DIR [--signa
 
 ## 持たない物
 
-仮想環境、`activate`、シェルの統合、MCP、版の範囲の解決（SAT）、外の依存の取得（git clone・hex）、WASM のコンパイル手順（`[wasm]` は宣言の形を検証するだけで、ビルドは「宣言のみ」と報告する）、鍵・署名・封じる・網。理由は ADR の「対象外」と「採らなかった案」。Future: `.app` ファイルの目録への掲載、`OR` 式のライセンスでどちらを取るかの宣言。
+仮想環境、`activate`、シェルの統合、MCP、版の範囲の解決（SAT）、外の依存の取得（git clone・hex）、鍵・署名・封じる・網。理由は ADR の「対象外」と「採らなかった案」。Future: `.app` ファイルの目録への掲載、`OR` 式のライセンスでどちらを取るかの宣言。
 
 旧 niuv（Nim の仮想環境の管理）の中身は jj のコミット `f06a84e1` と `88aacec2` に残してあり、消した物の一覧と読み戻し方は [docs/removed-2026-10-16.md](docs/removed-2026-10-16.md)。

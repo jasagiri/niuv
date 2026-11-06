@@ -242,6 +242,27 @@ when not defined(linux):
       check "--signature:/x/b.sig" in a and "--kernel:/x/k" in a and "--initrd:/x/i" in a
       check "--cpu:3" in a and "--memory:4096" in a
 
+    test "Given a package that declares a wasm component, When built in the builder, Then it is refused before the guest starts, unless --bin selects only nim bins (NIV-55)":
+      let r = setUp("ib-wasm")
+      writeTree(r.dir, {"app/niuv.toml": pkgToml("app", "\n[nim]\n[[nim.bin]]\nname = \"hello\"\nmain = \"child/hello.nim\"\n" &
+        "[[wasm.component]]\nname = \"probe\"\nentry = \"wasm/main.nim\"\nwit = \"wit\"\nworld = \"a:b/c\"\nexport = [\"run\"]\n" &
+        "[dependencies]\nworkspace = [\"lib\"]\n"),
+        "app/wasm/main.nim": "discard", "app/wit/a.wit": "package a:b;"})
+      lockHost(r)
+      writeLinuxLock(r)
+      let g = guestOutput(r, "wasm-guest")
+      withKite(r, proc () =
+        let all = r.build()
+        check all.code != 0
+        check "probe" in all.stderr and "no wasm component" in all.stderr
+        let named = r.build(@["--bin", "probe"])
+        check named.code != 0
+        check "no wasm component" in named.stderr
+        check not fileExists(r.log)
+        putEnv("FAKE_KITE_OUT", g)
+        let bins = r.build(@["--bin", "hello"])
+        check bins.code == 0)
+
     test "Given the Linux lock without a [builder], When built in the builder, Then it is refused and no guest starts":
       let r = setUp("ib-nobuilder")
       lockHost(r)

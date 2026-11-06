@@ -137,7 +137,7 @@ suite "NIV-08 check through the command line":
 
 # ---- Gleam, manifest, SBOM and the license gate through the command line --
 
-import std/json
+import std/[json, sequtils]
 import ../../src/niuv/[artifact, errors, manifest]
 
 proc makeMixed(dir: string, libLicense = "MIT", appNimSealed = false, appGleamSealed = false,
@@ -148,14 +148,17 @@ proc makeMixed(dir: string, libLicense = "MIT", appNimSealed = false, appGleamSe
   writeTree(dir, {
     "app/niuv.toml": pkgToml("app", "\n[nim]\n[[nim.bin]]\nname = \"hello\"\nmain = \"child/hello.nim\"\n" &
       "sealed = " & $appNimSealed & "\n[gleam]\nsealed = " & $appGleamSealed & "\n" &
-      (if wasm: "[wasm]\nentry = \"wasm/main.wat\"\n" else: "") &
+      (if wasm: "[[wasm.component]]\nname = \"probe\"\nentry = \"wasm/main.nim\"\nwit = \"wit\"\n" &
+        "world = \"niuv:probe/probe\"\nexport = [\"run\"]\nno_simd = true\n" else: "") &
       "[dependencies]\nworkspace = [\"lib\"]\n"),
     "app/child/hello.nim": "import greeter\necho greet(\"mixed\")\n",
     "app/src/placeholder.nim": "discard",
     "app/gleam.toml": "name = \"app\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\n\n[dependencies]\nlib_gl = { path = \"../lib\" }\n",
     "app/src/app.gleam": "import lib_gl\n\npub fn run() -> Int {\n  lib_gl.answer()\n}\n",
     "app/src/app_ffi.erl": "-module(app_ffi).\n-export([ping/0]).\nping() -> ok.\n",
-    "app/wasm/main.wat": "(module)\n",
+    "app/wasm/main.nim": "proc run(): uint32 {.exportc: \"run\", cdecl.} = 7\n",
+    "app/wasm/panicoverride.nim": "proc rawoutput(s: string) = discard\nproc panic(s: string) {.noreturn.} =\n  {.emit: \"__builtin_trap();\".}\n  while true: discard\n",
+    "app/wit/probe.wit": "package niuv:probe;\n\nworld probe {\n    export run: func() -> u32;\n}\n",
     "lib/niuv.toml": pkgToml("lib", "\n[nim]\n[gleam]\n").replace("Apache-2.0", libLicense),
     "lib/src/greeter.nim": "proc greet*(n: string): string = \"hello \" & n\n",
     "lib/gleam.toml": "name = \"lib_gl\"\nversion = \"0.1.0\"\ntarget = \"erlang\"\n",
@@ -243,16 +246,17 @@ suite "NIV-20 license gate through the command line":
     check runCli(@["lock", "--workspace", w]).code == 0
     check buildMixed(d, w).code == 0
 
-suite "NIV-04 wasm is declared, not built":
-  test "Given a wasm table, When built, Then the build says so and the manifest has no wasm entry":
+suite "NIV-51 a component beside the other kinds":
+  test "Given a Nim bin, a Gleam package and a wasm component, When built, Then the manifest lists all three kinds":
     let d = freshDir("cli-wasm")
     let w = makeMixed(d, wasm = true)
     check runCli(@["lock", "--workspace", w]).code == 0
     let r = buildMixed(d, w)
     check r.code == 0
-    check "wasm" in r.stdout and "not built" in r.stdout
-    for e in decodeManifest(readFile(d / "out" / "niuv.manifest.cbor")).get.entries:
-      check e.kind != akWasm
+    check "not built" notin r.stdout
+    let kinds = decodeManifest(readFile(d / "out" / "niuv.manifest.cbor")).get.entries.mapIt(it.kind)
+    check akWasm in kinds and akNimChild in kinds and akBeam in kinds
+    check fileExists(d / "out" / "wasm" / "probe.component.wasm")
 
 # ---- targets, per-target locks, the builder image and the guest ----------
 

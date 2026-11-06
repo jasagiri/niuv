@@ -261,7 +261,7 @@ proc verifyBuilderOutput*(outDir: string, want: Expectation): NResult[Verified] 
     case e.kind
     of akNimChild: path = outDir / e.name
     of akBeam: path = ?findBeam(outDir, e.name)
-    of akWasm: return guestErr[Verified]("the manifest lists a wasm artifact; niuv builds none")
+    of akWasm: return guestErr[Verified]("the manifest lists a wasm artifact; the builder builds no wasm component (NIV-55)")
     if not isPlainFile(path):
       return guestErr[Verified]("the manifest lists " & $e.kind & " '" & e.name & "' but " & path &
                                    " is not a regular file")
@@ -365,8 +365,13 @@ proc buildInBuilder*(ws: Workspace, package, namedTarget, outDir, stageRoot: str
   let kite = ?hostKite(ws)
   let root = ws.find(package).get
   for name in only:
-    if root.nim.bins.allIt(it.name != name):
-      return err(niuvError(ekUsage, "package '" & package & "' has no nim bin '" & name & "'"))
+    if root.nim.bins.allIt(it.name != name) and root.wasm.components.allIt(it.name != name):
+      return err(niuvError(ekUsage, "package '" & package & "' has no nim bin or wasm component '" & name & "'"))
+  # NIV-55: WASM components are built on the host, not in the builder.
+  let comps = root.wasm.components.filterIt(only.len == 0 or it.name in only)
+  if comps.len > 0:
+    return err(niuvError(ekUsage, "the builder builds no wasm component (" & comps.mapIt(it.name).join(", ") &
+                                  "); build it on the host, or select the nim bins with --bin"))
   let bins = root.nim.bins.filterIt(only.len == 0 or it.name in only).mapIt(it.name)
   let hex = ?hexFor([closure], o)
   ?freshEmptyDir(outDir)

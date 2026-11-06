@@ -5,7 +5,7 @@
 
 import std/[os, sequtils, strutils]
 import parsetoml
-import ./errors
+import ./[errors, wasm]
 
 const
   MaxFieldLen = 4096
@@ -28,10 +28,21 @@ type
     root*: string          ## relative to the package root
     sealed*: bool
 
+  WasmComponent* = object
+    name*: string
+    entry*: string         ## the Nim program, relative to the package root
+    wit*: string           ## the WIT directory, relative to the package root
+    world*: string         ## <package>/<world>
+    exports*: seq[string]  ## the core exports (C names)
+    stackSize*: int        ## bytes; 0 is niuv wasm's default (NIV-48)
+    paths*: seq[string]    ## extra `--path` directories, relative to the package root
+    flags*: seq[string]    ## extra Nim flags
+    noSimd*: bool
+    sealed*: bool
+
   WasmSection* = object
     present*: bool
-    entry*: string         ## relative to the package root
-    sealed*: bool
+    components*: seq[WasmComponent]
 
   ExternalDep* = object
     name*: string
@@ -176,12 +187,57 @@ proc readGleam(r: Reader, t: TomlTableRef, d: var PackageDecl): NResult[void] {.
   d.gleam.sealed = ?r.flag(t, "sealed", ctx)
   ok()
 
+proc relativeInside(r: Reader, rel, key, ctx: string): NResult[void] {.raises: [].} =
+  ## NIV-50: a path of a component is relative to the package. That it stays
+  ## inside the workspace is the workspace's check (it knows where the
+  ## workspace is): a component may reach a sibling package's sources.
+  if rel.isAbsolute:
+    return r.fail[:void](ctx, "'" & key & "' must be relative to the package: " & rel)
+  ok()
+
 proc readWasm(r: Reader, t: TomlTableRef, d: var PackageDecl): NResult[void] {.raises: [].} =
   const ctx = "wasm"
-  ?r.checkKeys(t, ["entry", "sealed"], ctx)
+  ?r.checkKeys(t, ["component"], ctx)
   d.wasm.present = true
-  d.wasm.entry = ?r.str(t, "entry", ctx, true)
-  d.wasm.sealed = ?r.flag(t, "sealed", ctx)
+  if not t.hasKey("component"):
+    return r.fail[:void](ctx, "needs at least one component ([[wasm.component]])")
+  let v = t.getOrDefault("component")
+  if v.kind != TomlValueKind.Array or v.arrayVal.len == 0:
+    return r.fail[:void](ctx, "needs at least one component ([[wasm.component]])")
+  for e in v.arrayVal:
+    if e.kind != TomlValueKind.Table:
+      return r.fail[:void](ctx, "'component' must be an array of tables ([[wasm.component]])")
+    let ct = e.tableVal
+    const cctx = "wasm.component"
+    ?r.checkKeys(ct, ["name", "entry", "wit", "world", "export", "stack_size", "paths", "flags", "no_simd", "sealed"], cctx)
+    var c = WasmComponent()
+    c.name = ?r.str(ct, "name", cctx, true)
+    if not validName(c.name):
+      return r.fail[:void](cctx, "name '" & c.name & "' may hold letters, digits, '-' and '_' only")
+    for other in d.wasm.components:
+      if other.name == c.name:
+        return r.fail[:void](cctx, "two components are named '" & c.name & "'")
+    c.entry = ?r.str(ct, "entry", cctx, true)
+    c.wit = ?r.str(ct, "wit", cctx, true)
+    c.world = ?r.str(ct, "world", cctx, true)
+    c.exports = ?r.strings(ct, "export", cctx)
+    if c.exports.len == 0:
+      return r.fail[:void](cctx, "missing key 'export' (at least one core export)")
+    c.paths = ?r.strings(ct, "paths", cctx)
+    c.flags = ?r.strings(ct, "flags", cctx)
+    c.noSimd = ?r.flag(ct, "no_simd", cctx)
+    c.sealed = ?r.flag(ct, "sealed", cctx)
+    if ct.hasKey("stack_size"):
+      let sv = ct.getOrDefault("stack_size")
+      if sv.kind != TomlValueKind.Int or sv.intVal < 0 or sv.intVal > int64(high(int32)):
+        return r.fail[:void](cctx, "'stack_size' must be a number of bytes")
+      c.stackSize = int(sv.intVal)
+      if not stackSizeValid(c.stackSize):
+        return r.fail[:void](cctx, "'stack_size' takes 65536 to 67108864 bytes, a multiple of 16")
+    ?r.relativeInside(c.entry, "entry", cctx)
+    ?r.relativeInside(c.wit, "wit", cctx)
+    for p in c.paths: ?r.relativeInside(p, "paths", cctx)
+    d.wasm.components.add c
   ok()
 
 proc readExternal(r: Reader, name: string, t: TomlTableRef): NResult[ExternalDep] {.raises: [].} =
@@ -236,6 +292,10 @@ proc parseDeclText*(text, fileName, declDir: string): NResult[PackageDecl] {.rai
   if top.hasKey("gleam"): ?r.readGleam(?r.table(top, "gleam", "top level"), d)
   if top.hasKey("wasm"): ?r.readWasm(?r.table(top, "wasm", "top level"), d)
   if top.hasKey("dependencies"): ?r.readDependencies(?r.table(top, "dependencies", "top level"), d)
+  for c in d.wasm.components:
+    for b in d.nim.bins:
+      if b.name == c.name:
+        return r.fail[:PackageDecl]("wasm.component", "'" & c.name & "' names a nim bin and a component")
   ok(d)
 
 proc parseDeclFile*(path: string): NResult[PackageDecl] {.raises: [].} =

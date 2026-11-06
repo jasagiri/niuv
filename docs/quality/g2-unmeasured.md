@@ -23,4 +23,5 @@
 | src/niuv/target.nim | 未測定（K4-2 で追加） |
 | src/niuv/inbuilder.nim | 未測定（K4-2 で追加） |
 | src/niuv/wasm.nim | 未測定 |
+| src/niuv/wasmbuild.nim | 未測定（ADR-NIUV-0007 で追加。decl・workspace・lock・build・cli・inbuilder の NIV-49〜57 の変更も同じ測定でまとめて流す） |
 | src/niuv/fingerprint.nim | 未測定 |

@@ -9,15 +9,20 @@ import ./[artifact, decl, errors, exec, hashing, resolve, toolchain]
 const
   MaxCompilerOutput = 8192
 
+proc closurePaths*(c: Closure): seq[string] {.raises: [].} =
+  ## The `--path` of every Nim package and external dependency of the closure
+  ## (NIV-14); a WASM component gets the same ones (NIV-56).
+  for p in c.packages:
+    if p.nim.present: result.add "--path:" & p.nimSrcDir
+  for e in c.externals:
+    result.add "--path:" & normalizedPath(e.dir / e.src)
+
 proc nimArgs*(c: Closure, root: PackageDecl, bin: NimBin, nimcache, outFile: string): seq[string] {.raises: [].} =
   result = @["c"]
   result.add root.nim.flags
   result.add bin.flags
   result.add ["--noNimblePath", "--skipUserCfg:on", "--skipParentCfg:on", "--skipProjCfg:on"]
-  for p in c.packages:
-    if p.nim.present: result.add "--path:" & p.nimSrcDir
-  for e in c.externals:
-    result.add "--path:" & normalizedPath(e.dir / e.src)
+  result.add closurePaths(c)
   result.add "--nimcache:" & nimcache
   result.add "-o:" & outFile
   result.add root.inRoot(bin.main)

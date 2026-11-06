@@ -76,8 +76,22 @@ proc checkMember(file: string, d: PackageDecl): NResult[void] {.raises: [].} =
   if d.gleam.present:
     let gt = d.inRoot(d.gleam.root) / "gleam.toml"
     if not fileExists(gt): return missing("the gleam root's gleam.toml", gt)
-  if d.wasm.present:
-    if not fileExists(d.inRoot(d.wasm.entry)): return missing("the wasm entry", d.inRoot(d.wasm.entry))
+  let wsDir = parentDir(file)
+  for c in d.wasm.components:
+    # NIV-50: what a component names stays inside the workspace and exists.
+    var named = @[("entry", c.entry), ("wit", c.wit)]
+    for p in c.paths: named.add ("paths", p)
+    for (what, rel) in named:
+      let p = d.inRoot(rel)
+      if not (p == wsDir or p.startsWith(wsDir & "/")):
+        return wsErr[void](file, "package '" & d.name & "': wasm component '" & c.name & "' " & what &
+                                 " " & rel & " leaves the workspace " & wsDir)
+    if not fileExists(d.inRoot(c.entry)):
+      return missing("the entry of wasm component '" & c.name & "'", d.inRoot(c.entry))
+    if not dirExists(d.inRoot(c.wit)):
+      return missing("the wit directory of wasm component '" & c.name & "'", d.inRoot(c.wit))
+    for p in c.paths:
+      if not dirExists(d.inRoot(p)): return missing("the path of wasm component '" & c.name & "'", d.inRoot(p))
   ok()
 
 proc allowOnly(t: TomlTableRef, allowed: openArray[string], file, ctx: string): NResult[void] {.raises: [].} =

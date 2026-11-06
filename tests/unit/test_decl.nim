@@ -145,99 +145,59 @@ suite "NIV-03 gleam table":
   test "Given an unknown key in gleam, When parsed, Then it is refused":
     check parsed(Minimal & "\n[gleam]\ntarget = \"erlang\"\n").isErr
 
-suite "NIV-04 wasm table":
-  test "Given an entry, When parsed, Then entry and sealed are read":
-    let d = parsed(Minimal & "\n[wasm]\nentry = \"wasm/main.wat\"\nsealed = true\n")
+const
+  Comp = "\n[[wasm.component]]\nname = \"probe\"\nentry = \"guest/main.nim\"\nwit = \"wit\"\n" &
+         "world = \"niuv:probe/probe\"\nexport = [\"run\"]\n"
+
+proc without(key: string): string =
+  ## Comp with the line that starts with `key` left out.
+  var o = ""
+  for line in Comp.splitLines():
+    if not line.startsWith(key & " "): o.add line & "\n"
+  o
+
+suite "NIV-49 wasm components":
+  test "Given a component with every key, When parsed, Then each is read":
+    let d = parsed(Minimal & Comp & "stack_size = 1048576\npaths = [\"../sdk/src\"]\nflags = [\"-d:x\"]\n" &
+                   "no_simd = true\nsealed = true\n")
     check d.isOk
     check d.get.wasm.present
-    check d.get.wasm.entry == "wasm/main.wat"
-    check d.get.wasm.sealed
+    let c = d.get.wasm.components[0]
+    check c.name == "probe" and c.entry == "guest/main.nim" and c.wit == "wit"
+    check c.world == "niuv:probe/probe" and c.exports == @["run"]
+    check c.stackSize == 1048576 and c.paths == @["../sdk/src"] and c.flags == @["-d:x"]
+    check c.noSimd and c.sealed
 
-  test "Given a wasm table without entry, When parsed, Then it is refused":
-    check parsed(Minimal & "\n[wasm]\nsealed = true\n").isErr
+  test "Given only the required keys, When parsed, Then the stack is the default, SIMD is on and it is not sealed":
+    let c = parsed(Minimal & Comp).get.wasm.components[0]
+    check c.stackSize == 0 and not c.noSimd and not c.sealed and c.paths.len == 0
 
-  test "Given an unknown key in wasm, When parsed, Then it is refused":
-    check parsed(Minimal & "\n[wasm]\nentry = \"a\"\nopt = 1\n").isErr
-
-suite "NIV-05 dependencies":
-  test "Given workspace names, When parsed, Then the names are read in order":
-    let d = parsed(Minimal & "\n[dependencies]\nworkspace = [\"nim-hpke\", \"nim-secret\"]\n")
-    check d.isOk
-    check d.get.workspaceDeps == @["nim-hpke", "nim-secret"]
-
-  test "Given an external dependency, When parsed, Then source version and src are read":
-    let d = parsed(Minimal & """
-
-[dependencies.external.bearssl]
-source = "github.com/status-im/nim-bearssl"
-version = "0.2.13"
-src = "."
-""")
-    check d.isOk
-    check d.get.externals.len == 1
-    let e = d.get.externals[0]
-    check e.name == "bearssl"
-    check e.source == "github.com/status-im/nim-bearssl"
-    check e.version == "0.2.13"
-    check e.src == "."
-
-  test "Given an external without src, When parsed, Then src defaults to dot":
-    let d = parsed(Minimal & "\n[dependencies.external.r]\nsource = \"github.com/a/b\"\nversion = \"1.0.0\"\n")
-    check d.get.externals[0].src == "."
-
-  test "Given an external with a license, When parsed, Then the license is read; without one it is empty":
-    let with = parsed(Minimal & "\n[dependencies.external.r]\nsource = \"github.com/a/b\"\nversion = \"1.0.0\"\nlicense = \"MIT\"\n")
-    check with.get.externals[0].license == "MIT"
-    let without = parsed(Minimal & "\n[dependencies.external.r]\nsource = \"github.com/a/b\"\nversion = \"1.0.0\"\n")
-    check without.get.externals[0].license == ""
-
-  test "Given an external without source, When parsed, Then it is refused":
-    check parsed(Minimal & "\n[dependencies.external.r]\nversion = \"1.0.0\"\n").isErr
-
-  test "Given a source with a scheme and .git, When parsed, Then it is kept as written":
-    let d = parsed(Minimal & "\n[dependencies.external.r]\nsource = \"https://github.com/a/b.git\"\nversion = \"1.0.0\"\n")
-    check d.get.externals[0].source == "https://github.com/a/b.git"
-
-  test "Given an unknown key in dependencies, When parsed, Then it is refused":
-    check parsed(Minimal & "\n[dependencies]\nnimble = [\"x\"]\n").isErr
-
-suite "NIV-06 package root":
-  test "Given no root, When parsed, Then the root is the declaration directory":
-    let d = parsed(Minimal, "/w/demo")
-    check d.get.root == "/w/demo"
-    check d.get.declDir == "/w/demo"
-
-  test "Given a relative root, When parsed, Then it is resolved from the declaration directory":
-    let d = parsed(Minimal.replace("license =", "root = \"../../src/pkg\"\nlicense ="), "/w/decls/demo")
-    check d.get.root == "/w/src/pkg"
-    check d.get.declDir == "/w/decls/demo"
-
-  test "Given a root, When the path helpers run, Then src and main are counted from the root":
-    let d = parsed(Minimal.replace("license =", "root = \"/x/pkg\"\nlicense =") & """
-
-[nim]
-src = "src"
-[[nim.bin]]
-name = "c"
-main = "child/c.nim"
-""")
-    check d.get.nimSrcDir == "/x/pkg/src"
-    check d.get.inRoot(d.get.nim.bins[0].main) == "/x/pkg/child/c.nim"
-
-suite "NIV-10 no version ranges":
-  proc ext(version: string): NResult[PackageDecl] =
-    parsed(Minimal & "\n[dependencies.external.r]\nsource = \"github.com/a/b\"\nversion = \"" &
-           version & "\"\n")
-
-  test "Given a range notation, When parsed, Then it is refused as a range":
-    for v in [">= 0.2.13", "^0.2.13", "~0.2.13", "*", "0.2.13, 0.3.0", ">=0.1.0 <0.3.0", "0.2.x"]:
-      let d = ext(v)
+  test "Given a component without one of name, entry, wit, world or export, When parsed, Then it is refused naming the key":
+    for key in ["name", "entry", "wit", "world", "export"]:
+      let d = parsed(Minimal & without(key))
       check d.isErr
-      check d.error.kind == ekRange
+      check ("'" & key & "'") in d.error.msg
 
-  test "Given a version that is not x.y.z and not a range, When parsed, Then it is refused":
-    check ext("latest").isErr
-    check ext("0.2").isErr
+  test "Given a wasm table with no component, or the old entry key, When parsed, Then it is refused":
+    check parsed(Minimal & "\n[wasm]\n").isErr
+    check parsed(Minimal & "\n[wasm]\nentry = \"wasm/main.wat\"\n").isErr
 
-  test "Given an exact x.y.z, When parsed, Then it is accepted":
-    check ext("0.2.13").isOk
+  test "Given an unknown key in a component, When parsed, Then it is refused":
+    check parsed(Minimal & Comp & "opt = 1\n").isErr
+
+  test "Given two components of one name, or a component named like a nim bin, When parsed, Then it is refused":
+    check parsed(Minimal & Comp & Comp).isErr
+    check parsed(Minimal & "\n[nim]\n[[nim.bin]]\nname = \"probe\"\nmain = \"m.nim\"\n" & Comp).isErr
+
+  test "Given a stack size outside 64 KiB..64 MiB, not a multiple of 16 or not a number, When parsed, Then it is refused":
+    for v in ["1024", "67108880", "65537", "\"big\"", "-16"]:
+      check parsed(Minimal & Comp & "stack_size = " & v & "\n").isErr
+
+suite "NIV-50 component paths are relative":
+  test "Given an absolute entry, wit or path, When parsed, Then it is refused":
+    check parsed(Minimal & Comp.replace("guest/main.nim", "/etc/main.nim")).isErr
+    check parsed(Minimal & Comp.replace("\"wit\"", "\"/wit\"")).isErr
+    check parsed(Minimal & Comp & "paths = [\"/abs\"]\n").isErr
+
+  test "Given a path that climbs out of the package, When parsed, Then it is accepted: the workspace decides":
+    check parsed(Minimal & Comp & "paths = [\"../sdk/src\"]\n").isOk

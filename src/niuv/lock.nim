@@ -68,8 +68,9 @@ proc packageHash*(d: PackageDecl, ws: Workspace): NResult[string] {.raises: [].}
   ## The declared sources of a package: the declaration, the Nim src
   ## directory, the directory of each bin's main (or the main alone when it
   ## sits in the root), the Gleam root without its build output, the WASM
-  ## entry. Files outside these (tests, docs, bin/) do not move the hash, and
-  ## neither does the workspace (NIV-33).
+  ## components' program directories, WIT trees and paths (NIV-57).
+  ## Files outside these (tests, docs, bin/) do not move the hash, and neither
+  ## does the workspace (NIV-33).
   var entries: seq[tuple[label, path: string]]
   proc add(label, path: string) {.raises: [].} =
     if entries.allIt(it.label != label): entries.add (label: label, path: path)
@@ -87,8 +88,18 @@ proc packageHash*(d: PackageDecl, ws: Workspace): NResult[string] {.raises: [].}
       else: ?addTree(dir, "bin-dir:" & b.name & ":")
   if d.gleam.present:
     ?addTree(d.inRoot(d.gleam.root), "gleam:")
-  if d.wasm.present:
-    add("wasm:" & d.wasm.entry, d.inRoot(d.wasm.entry))
+  for c in d.wasm.components:
+    # What the component's build reads (NIV-57): its program's directory
+    # (panicoverride.nim sits there), the WIT tree and the extra paths.
+    let entry = d.inRoot(c.entry)
+    if parentDir(entry) == d.root:
+      add("wasm-entry:" & c.name & ":" & c.entry, entry)
+      let panic = d.root / "panicoverride.nim"
+      if fileExists(panic): add("wasm-panic:" & c.name, panic)
+    else: ?addTree(parentDir(entry), "wasm-dir:" & c.name & ":")
+    ?addTree(d.inRoot(c.wit), "wasm-wit:" & c.name & ":")
+    for p in c.paths:
+      ?addTree(d.inRoot(p), "wasm-path:" & c.name & ":" & p & ":")
   hashEntries(entries)
 
 proc lockPackage*(ws: Workspace, d: PackageDecl): NResult[LockedPackage] {.raises: [].} =
