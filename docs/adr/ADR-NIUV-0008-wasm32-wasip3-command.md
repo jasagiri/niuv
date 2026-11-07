@@ -63,3 +63,10 @@ A を採る。
 
 - ADR-NIUV-0003: wasm32-wasip1 の command (NIV-34〜39)。NIV-35 の `start.c` を、この ADR で 0 でない結果を `exit()` で終える形に改めた。
 - ADR-NIUV-0004: component の形 (NIV-40〜45)。wasip3 とは組まない。
+
+## 訂正 (2026-11-07、NIV-63 を足した)
+
+会社の計画の手順 4 で、Nim のスクリプトが自前の WIT の interface (`example:pipeline`) を import する。wasi-libc の wasip3 の core は WASI の型の情報を自分で持つが、自前の import の型は持たないので、`wasm-component-ld` に渡す。
+
+- **NIV-63** `niuv wasm --target wasm32-wasip3 --component-type <WIT ファイル>` (何度でも) は、各ファイルを `-Wl,--component-type=<場所>` として `wasm-component-ld` に渡す。component はその interface を import する。wasip1 か component の形で使う、ファイルが無い、のどちらも使い方の誤りとして断る。E テストは `tests/unit/test_wasm.nim` の `NIV-63 more WIT for a wasip3 command`。
+

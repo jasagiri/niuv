@@ -23,6 +23,7 @@ commands:
   wasm <program.nim>        build one Nim program as a wasm32-wasip1 command module (not locked)
                             [--target wasm32-wasip1|wasm32-wasip3]  wasip3: a WASI 0.3 command component
                               (needs wasm-component-ld on PATH; --out defaults to build/<target>)
+                              [--component-type WIT]...  more WIT for the command's imports (wasip3 only)
                             [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
                             [--llvm DIR] [--sysroot DIR] [--stack-size BYTES]  (default 8 MiB; 64 KiB..64 MiB)
                             [--component WIT-DIR --world PKG/WORLD --export NAME...]  a component of a WIT world
@@ -251,7 +252,8 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
 
 proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
   let p = parseArgs(args, ["--out", "--name", "--stage", "--nim-flag", "--llvm", "--sysroot",
-                           "--component", "--world", "--export", "--adapter", "--stack-size", "--target"],
+                           "--component", "--world", "--export", "--adapter", "--stack-size", "--target",
+                           "--component-type"],
                     ["--no-simd", "--aot", "--wasi"])
   if p.isErr: return usageFail(p.error)
   if p.get.positional.len != 1: return usageFail("wasm needs one Nim program")
@@ -263,8 +265,13 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
   of $wtWasip1: target = wtWasip1
   of $wtWasip3: target = wtWasip3
   else: return usageFail("--target takes wasm32-wasip1 or wasm32-wasip3")
+  if p.get.opts.hasKey("--component-type") and target != wtWasip3:
+    return usageFail("--component-type is for wasm32-wasip3")
   var program, outDir: string
+  var componentTypes: seq[string]
   try:
+    for wit in p.get.opts.getOrDefault("--component-type"):
+      componentTypes.add normalizedPath(absolutePath(wit))
     program = normalizedPath(absolutePath(p.get.positional[0]))
     outDir = normalizedPath(absolutePath(last("--out", program.parentDir / "build" / $target)))
   except CatchableError as e:
@@ -308,7 +315,7 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
                         simd: not p.get.opts.hasKey("--no-simd"), aot: aot,
                         shape: (if component: wsComponent else: wsCommand), witDir: witDir,
                         world: last("--world", ""), exports: p.get.opts.getOrDefault("--export"), adapter: adapter,
-                        stackSize: stackSize)
+                        stackSize: stackSize, componentTypes: componentTypes)
   let r = buildWasm(tc.get, req)
   if r.isErr: return fail($r.error)
   var o = (if component: "core " else: "wasm ") & r.get.wasm & "\n"

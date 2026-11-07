@@ -631,3 +631,66 @@ suite "NIV-62 --aot for wasip3":
     let (o, code) = runP3(built.get.cwasm, precompiled = true)
     check code == 0
     check "p3 aot ok" in o
+
+# NIV-63 (ADR-NIUV-0008): more WIT for a wasip3 command, handed to wasm-component-ld.
+
+const
+  pipeWit = """
+package niuv:pipe@0.1.0;
+
+interface tool {
+  run: func(input: list<u8>) -> list<u8>;
+}
+
+world script {
+  import tool;
+}
+"""
+  pipeProgram = """
+import std/os
+proc toolRun(input: pointer, inputLen: int32, retptr: pointer) {.importc: "niuv_pipe_tool_run", cdecl,
+  codegenDecl: "__attribute__((import_module(\"niuv:pipe/tool@0.1.0\"), import_name(\"run\"))) $# $#$#".}
+var ret: array[8, byte]
+if paramCount() > 99: toolRun(nil, 0, addr ret)
+echo "with the tool"
+"""
+
+suite "NIV-63 more WIT for a wasip3 command":
+  test "Given a WIT file and a program calling its import, When built for wasip3 with it, Then the component imports that interface and still runs as a command":
+    let d = freshDir("wasm-p3-ctype")
+    writeTree(d, {"main.nim": pipeProgram, "pipe.wit": pipeWit})
+    var req = request(d / "main.nim", d)
+    req.componentTypes = @[d / "pipe.wit"]
+    let built = buildWasm(p3Toolchain(), req)
+    check built.isOk
+    let (wit, code) = execCmdEx("wasm-tools component wit " & quoteShell(built.get.wasm))
+    check code == 0
+    check "import niuv:pipe/tool@0.1.0;" in wit
+    check "export wasi:cli/run@0.3.0;" in wit
+    check ("-Wl,--component-type=" & d / "pipe.wit") in linkArgs(p3Toolchain(), true, @["a.o"], "b.o", "x.wasm",
+                                                              componentTypes = req.componentTypes)
+
+  test "Given a WIT file for a wasip1 build, or one that does not exist, When built, Then each is refused as a usage error":
+    let d = freshDir("wasm-p3-ctype-bad")
+    writeTree(d, {"main.nim": "echo 1\n", "pipe.wit": pipeWit})
+    var p1 = request(d / "main.nim", d)
+    p1.componentTypes = @[d / "pipe.wit"]
+    let r1 = buildWasm(toolchain(aot = false), p1)
+    check r1.isErr and r1.error.kind == ekUsage
+    var missing = request(d / "main.nim", d)
+    missing.componentTypes = @[d / "absent.wit"]
+    let r2 = buildWasm(p3Toolchain(), missing)
+    check r2.isErr and r2.error.kind == ekUsage
+    check "absent.wit" in r2.error.msg
+
+  test "Given --component-type on the command line, When run with wasip3, Then it is used, and without wasip3 it is refused":
+    let d = freshDir("wasm-p3-ctype-cli")
+    writeTree(d, {"main.nim": pipeProgram, "pipe.wit": pipeWit})
+    let ok = runCli(@["wasm", d / "main.nim", "--target", "wasm32-wasip3", "--component-type", d / "pipe.wit",
+                      "--stage", d / "s"])
+    check ok.code == 0
+    let (wit, _) = execCmdEx("wasm-tools component wit " & quoteShell(d / "build" / "wasm32-wasip3" / "main.wasm"))
+    check "import niuv:pipe/tool@0.1.0;" in wit
+    let p1 = runCli(@["wasm", d / "main.nim", "--component-type", d / "pipe.wit"])
+    check p1.code == 2
+    check "--component-type is for wasm32-wasip3" in p1.stderr

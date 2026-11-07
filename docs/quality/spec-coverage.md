@@ -105,3 +105,4 @@
 | NIV-60 | tests/unit/test_wasm.nim: `NIV-60 the 128-bit multiply for wasip3`（wasip3 の置き方で見つけ、wasip1 のものは使わない、写しで正しい積） | あり |
 | NIV-61 | tests/unit/test_wasm.nim: `NIV-61 niuv wasm --target on the command line`（既定の置き場 `build/wasm32-wasip3`、`--target wasm32-wasip1`、知らない対象と `--component` を断る、help） | あり |
 | NIV-62 | tests/unit/test_wasm.nim: `NIV-62 --aot for wasip3`（出力先は .wasm と .cwasm だけ、.cwasm が走る） | あり |
+| NIV-63 | tests/unit/test_wasm.nim: `NIV-63 more WIT for a wasip3 command`（import が component に載り、command として走る。wasip1 と無いファイルを断る。コマンドの行） | あり |

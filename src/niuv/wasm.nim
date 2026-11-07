@@ -98,6 +98,7 @@ type
     exports*: seq[string]    ## wsComponent: the core exports (with cabi_realloc when the world needs it)
     adapter*: string         ## wsComponent: a preview1 reactor adapter; then the core is a WASI reactor (NIV-44)
     stackSize*: int          ## bytes of stack; 0 is StackSize (NIV-48)
+    componentTypes*: seq[string]  ## wtWasip3: WIT files for wasm-component-ld's --component-type (NIV-63)
 
   WasmOutput* = object
     wasm*, cwasm*: string    ## wsComponent: `wasm` is <name>.core.wasm
@@ -128,12 +129,13 @@ proc stackSizeValid*(bytes: int): bool {.raises: [].} =
   bytes >= MinStackSize and bytes <= MaxStackSize and bytes mod 16 == 0
 
 proc linkArgs*(tc: WasmToolchain, simd: bool, objects: seq[string], builtins, outFile: string,
-               stackSize = StackSize): seq[string] {.raises: [].} =
+               stackSize = StackSize, componentTypes: seq[string] = @[]): seq[string] {.raises: [].} =
   ## For wasip3, clang's driver links through wasm-component-ld, which runs
   ## wasm-ld and makes the component; the one the toolchain found is named, so
   ## clang does not pick another from its own search (NIV-59).
   result = targetCFlags(tc.sysroot, simd, tc.target)
   if tc.target == wtWasip3: result.add "-fuse-ld=" & tc.componentLd
+  for wit in componentTypes: result.add "-Wl,--component-type=" & wit
   result.add @["-nodefaultlibs", "-Wl,--fatal-warnings", "-Wl,--max-memory=" & $MaxMemory,
                "-Wl,-z,stack-size=" & $stackSize]
   result.add objects
@@ -289,6 +291,12 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
   let stack = (if req.stackSize == 0: StackSize else: req.stackSize)
   if not stackSizeValid(stack):
     return err(niuvError(ekUsage, "a stack of " & $stack & " bytes: give 65536 to 67108864, a multiple of 16"))
+  if req.componentTypes.len > 0:
+    if tc.target != wtWasip3 or req.shape != wsCommand:
+      return err(niuvError(ekUsage, "more WIT (--component-type) is for a wasm32-wasip3 command"))
+    for wit in req.componentTypes:
+      if not fileExists(wit):
+        return err(niuvError(ekUsage, "the WIT file " & wit & " does not exist"))
   if req.shape == wsComponent:
     if tc.target != wtWasip1:
       return err(niuvError(ekUsage, "a component of a world is built for wasm32-wasip1; a " & $tc.target &
@@ -356,7 +364,7 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
                      "(`brew install wasi-runtimes` would provide compiler-rt; the owner's call)"
   let args =
     case req.shape
-    of wsCommand: linkArgs(tc, req.simd, objects, builtins, output.wasm, stack)
+    of wsCommand: linkArgs(tc, req.simd, objects, builtins, output.wasm, stack, req.componentTypes)
     of wsComponent:
       if req.adapter.len > 0: reactorLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm, stack)
       else: componentLinkArgs(tc, req.simd, objects, req.exports, builtins, output.wasm, stack)

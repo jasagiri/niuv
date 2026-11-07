@@ -54,7 +54,7 @@ niuv build <package> [--out DIR] [--bin NAME]... [--stage DIR]
 niuv child                                   # nim-frames の枠で 1 つのビルドの頼みを受ける（腐海の子）
 niuv --version [--check]                     # 版と、組んだソースの指紋（--check: 終了の値 0 一致・3 古い・4 ソースが無い）。ソースが後で変わっていれば、ほかのコマンドは作り直しを求めて断る（ADR-NIUV-0005）
 niuv wasm <program.nim> [--out DIR] [--aot] [--nim-flag F]... [--no-simd]   # 1 つの Nim のプログラムを wasm32-wasip1 に組む（宣言・ロックなし）
-niuv wasm <program.nim> --target wasm32-wasip3 [--out DIR] [--aot]   # WASI 0.3 の command の component に組む（ADR-NIUV-0008。wasm-component-ld が要る）
+niuv wasm <program.nim> --target wasm32-wasip3 [--out DIR] [--aot] [--component-type WIT]...   # WASI 0.3 の command の component に組む（ADR-NIUV-0008。wasm-component-ld が要る。--component-type で自前の import の WIT を足す）
 niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --export NAME... [--out DIR]   # WIT の world の component に組む（ADR-NIUV-0004）
 niuv wasm <program.nim> --component WIT-DIR --world PKG/WORLD --wasi [--adapter FILE]       # WASI 0.3 を import する world: wasip1 の reactor に adapter を付ける
 
