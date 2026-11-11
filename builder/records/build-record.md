@@ -164,3 +164,20 @@ The base was not packed from podman layers: the Alpine root (pinned digest) with
 Why `musl` and `musl-dev` are 1.2.6-r3 (approved 2026-10-22): r2 was dropped from Alpine v3.24's index (r3 only), so the recorded set could not be installed; `records/apk-info.txt` lists r3.
 
 Kernel of the two guests with a network (`initrd`, `base`): `Image-vsock`, made by K5-2b (kite-container `build/assets/Image-vsock`, 2026-10-22), sha256 `f5c2660e96567753abb6a40c2dc0d4b66881a96351b44a3c79c87e772aec561b`. `Image-custom` has no nf_tables, and kite's init stops at "cannot load the firewall" with `--net`. The copy is `kite-site/assets/Image-vsock` (signed there with the development key); the original is untouched. The guests without a network (builds, selftest, acceptance) use `Image-custom` (sha256 `9e181c25…`).
+
+## The image of 2026-11-11: derived again, for niuv 657e24ce
+
+The island node's link command passed 32k, so Nim wrote its response file into its working directory,
+which the image's niuv (from `7a3f3946`) had set to the read-only package root: `cannot open:
+island_node_linkerArgs.txt`. niuv `657e24ce` runs the compiler in its cache under the stage root. The
+image was derived from the same base with `derive.sh`; only `/usr/local/bin/niuv` and `/etc/hosts`
+differ from the base (6234 entries; `builder-run` is the base's file, as before).
+
+| | |
+|---|---|
+| Base | `niuv/builder-base@sha256:83187985f489b596d3ccd33a7173489b3d8aa8b02afe8247486ca0c376c583ea` (the base of 2026-10-22) |
+| Manifest digest (what `[builder]` pins from now on) | `sha256:dbbfd6883faf50f7e7cb3b94d49133ab02f41edf9cbfc124442a89480323b84a` |
+| niuv in the image | built for `aarch64-linux-musl` in the guest of `sha256:4131aa3a…` from niuv `657e24ce`, 1,232,408 bytes, sha256 `da8487d911c092c2cc4dade5c2f8b9cb6438e43e2084a6445bdb7052ced88966` |
+| Reproduced | the derived tree packed twice gave one digest; the image read back lists the same 6234 entries as the tree |
+| Signed by | the development key `godsgolem-kite-site-dev` (not a release key, fukai roadmap 118) |
+| Checked | gate-node's image builds, checks (ISG-02) and signs with it; the island node links in it |
