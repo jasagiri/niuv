@@ -151,6 +151,36 @@ suite "NIV-15 nim build":
     check built.error.kind == ekBuild
     check "hello.nim" in built.error.msg
 
+  test "Given a read-only package root and a link command too long for one line, When built, Then it builds":
+    # SPEC: NIV-15
+    # The compiler then writes the link command to a file in its working directory (a response file on
+    # Linux, a shell script on macOS); in the builder guest the sources are mounted read-only.
+    let d = freshDir("nim-longlink")
+    var long = ""
+    while long.len < 300_000: long.add " -L/nonexistent/niuv-long-link-command"
+    let ws = makeWorkspace(d)
+    let app = d / "app"
+    writeFile(app / "child" / "hello.nim", readFile(app / "child" / "hello.nim") & "{.passL: \"" & long.strip & "\".}\n")
+    var dirs = @[app]
+    for p in walkDirRec(app, yieldFilter = {pcDir}): dirs.add p
+    for p in dirs: setFilePermissions(p, {fpUserRead, fpUserExec, fpGroupRead, fpGroupExec})
+    let built = build(d, ws)
+    for p in dirs: setFilePermissions(p, {fpUserRead, fpUserWrite, fpUserExec, fpGroupRead, fpGroupExec})
+    check built.isOk
+    if built.isErr: echo built.error.msg
+
+  test "Given a relative out directory, When built, Then the bin is placed there, counted from where niuv runs":
+    # SPEC: NIV-15
+    let d = freshDir("nim-relout")
+    let ws = makeWorkspace(d)
+    let c = resolveClosure(ws, "app").get
+    let before = getCurrentDir()
+    setCurrentDir(d)
+    let built = buildNim(realNim(), c, "relout", d / "stage")
+    setCurrentDir(before)
+    check built.isOk
+    check fileExists(d / "relout" / "hello")
+
   test "Given the same input built twice, When compared, Then the executables are byte-equal":
     let d = freshDir("nim-twice")
     let ws = makeWorkspace(d)

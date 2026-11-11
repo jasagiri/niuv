@@ -50,14 +50,19 @@ proc buildNim*(nim: ToolInfo, c: Closure, outDir, stageRoot: string,
   for bin in root.nim.bins:
     if only.len > 0 and bin.name notin only: continue
     let outFile = outDir / bin.name
-    var outAbs: string
+    var outAbs, cache: string
     try:
       outAbs = absolutePath(outDir)
+      cache = absolutePath(stageRoot) / "nimcache" / sha256Hex(outAbs)[0 ..< 16] / bin.name
+      createDir(cache)
     except CatchableError as e:
-      return err(niuvError(ekIo, outDir & ": " & e.msg))
-    let cache = stageRoot / "nimcache" / sha256Hex(outAbs)[0 ..< 16] / bin.name
-    let args = nimArgs(c, root, bin, cache, outFile)
-    let r = ?runProcess(nim.exe, args, workDir = root.root)
+      return err(niuvError(ekIo, outDir & ", " & stageRoot & ": " & e.msg))
+    let args = nimArgs(c, root, bin, cache, outAbs / bin.name)
+    # Why not the package root as the working directory: when the link command is too long for one line the
+    # compiler writes it to a file in its working directory (a response file on Linux, a script on macOS), and
+    # the root may be read-only (the builder guest mounts the sources so). Every path niuv passes is absolute
+    # and no configuration file is read (NIV-14), so the compiler's cache serves as its working directory.
+    let r = ?runProcess(nim.exe, args, workDir = cache)
     if r.code != 0:
       return err(niuvError(ekBuild, "nim failed for bin '" & bin.name & "' of '" & c.root &
                            "' (exit " & $r.code & "):\n" & tail(r.output, MaxCompilerOutput)))
