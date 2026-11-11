@@ -20,10 +20,10 @@
 | NIV-14 | tests/unit/test_nimbuild.nim: `NIV-14 nim plumbing` | あり（N1） |
 | NIV-15 | tests/unit/test_nimbuild.nim: `NIV-15 nim build`、tests/unit/test_cli.nim: `NIV-15 NIV-18 NIV-19 a mixed build writes a manifest and an SBOM` | あり（N1） |
 | NIV-16 | tests/unit/test_gleambuild.nim: `NIV-16 gleam plumbing` | あり（N2） |
-| NIV-17 | tests/unit/test_gleambuild.nim: `NIV-17 fixed bytes`、tests/acceptance/test_fukai_agent.nim: `N2 acceptance: fukai/agent from two places`（test_all の外） | あり（N2） |
+| NIV-17 | tests/unit/test_gleambuild.nim: `NIV-17 fixed bytes`、tests/acceptance/test_gleam_closure_places.nim: `N2 acceptance: a closure of gl-* packages from two places`（test_all の外） | あり（N2） |
 | NIV-18 | tests/unit/test_manifest.nim: `NIV-18 manifest`、tests/unit/test_cli.nim の同上 suite | あり（N2） |
 | NIV-19 | tests/unit/test_sbom.nim: `NIV-19 sbom`、tests/unit/test_cli.nim の同上 suite | あり（N2） |
-| NIV-20 | tests/unit/test_sbom.nim: `NIV-20 license gate`、tests/unit/test_cli.nim: `NIV-20 license gate through the command line`、tests/acceptance/test_fukai_agent.nim: `N2 acceptance: a GPL-3.0 dependency of a sealed agent` | あり（N2） |
+| NIV-20 | tests/unit/test_sbom.nim: `NIV-20 license gate`、tests/unit/test_cli.nim: `NIV-20 license gate through the command line`、tests/acceptance/test_gleam_closure_places.nim: `N2 acceptance: a GPL-3.0 dependency of a sealed closure root` | あり（N2） |
 | NIV-21 | tests/unit/test_child.nim: `NIV-21 child form` | あり（N2） |
 | NIV-22 | tests/unit/test_cli.nim: `NIV-22 commands` | あり（N1） |
 | NIV-23 | tests/unit/test_gleambuild.nim: `NIV-23 beam placement` | あり（N2） |
@@ -47,7 +47,7 @@
 
 ## 注
 
-- 「あり」は、その suite が `tests/test_all.nim` に入っており、全部緑であること（`tests/acceptance/` は fukai の兄弟リポジトリを読むので test_all の外で、手で流す）。テストが無い規則の行は「未実装」と書く。実装と同じ変更でこの表を更新する。
+- 「あり」は、その suite が `tests/test_all.nim` に入っており、全部緑であること（`tests/acceptance/` は foundation の兄弟リポジトリを読むので test_all の外で、手で流す）。テストが無い規則の行は「未実装」と書く。実装と同じ変更でこの表を更新する。
 - 警告 0 は `nim check tests/test_all.nim` で確かめる。
 - 対象外の文（G0）は `docs/adr/ADR-NIUV-0001.md` の「対象外」の表にある。
 

@@ -82,7 +82,7 @@ niuv build <package> --target aarch64-linux-musl --in-builder --out DIR [--signa
 ## 確かめていること・いないこと
 
 - Nim: 同じ引数の `nim c` と同じバイト列ができる（設定ファイルと nimble の暗黙の探索を使わない）
-- Gleam: パッケージごとに `gleam compile-package` を呼ぶ（gleam に依存の解決をさせないので、網のないゲストでも通る。NIV-16）。場所の違う 2 か所からビルドして、出荷される全 `.beam`（Erlang の FFI と Hex のパッケージを含む）の SHA-256 が一致する（`tests/acceptance/test_fukai_agent.nim` で実物の `fukai/agent` を、`tests/unit/test_gleambuild.nim` で小さな例を）
+- Gleam: パッケージごとに `gleam compile-package` を呼ぶ（gleam に依存の解決をさせないので、網のないゲストでも通る。NIV-16）。場所の違う 2 か所からビルドして、出荷される全 `.beam`（Erlang の FFI と Hex のパッケージを含む）の SHA-256 が一致する（`tests/acceptance/test_gleam_closure_places.nim` で実物の `gl-*` の閉包（`gl-upgrade-coordinator`→`gl-hotswap`、Erlang の FFI を持つ `gl-port`・`gl-unix-frames`、Hex の `gleam_stdlib`・`gleam_erlang`）を、`tests/unit/test_gleambuild.nim` で小さな例を）
 - テスト: `tests/test_all.nim` で 307 件（警告 0）。kite を使う部分は偽の kite で確かめている。`tests/acceptance/` は兄弟のリポジトリや実物の kite を使うので、その外で手で流す
 - 確かめていない: Linux・Windows、gleam 1.19.1 と OTP 29.1.1 以外の版、Hex の写しを niuv が自分で取得する経路（niuv は取得せず、gleam の Hex の写しを読んで checksum を確かめるだけ）、変異検査（`docs/quality/g2-unmeasured.md`）
 

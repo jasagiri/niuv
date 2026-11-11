@@ -289,3 +289,10 @@ K4-3 の像 `sha256:40ede3aa…` の中の niuv は NIV-33 の前の物で、ゲ
 - NIV-24 の範囲に `x86_64-linux-gnu` と `x86_64-linux-musl` を足した (代表の決定、2026-11-05「x86_64 の 2 つを足す」。x86-64 の Linux の機械 (Surface Laptop 4、EndeavourOS) で試験を流すため)。判定はこれまでどおり実行時: CPU は `hostCPU` (`amd64` を `x86_64` と書く)、Linux の libc は `/lib/ld-musl-<cpu>.so.1` があれば musl、無ければ glibc (`gnu`)。`aarch64-linux-gnu` はまだ目標ではなく、名指しで断る。
 - クロスコンパイルをしない規則は変わらない。x86_64 の目標は、x86_64 の機械の上で作る。x86_64 のビルド用の像 (NIV-27 の `--in-builder`) は無い: kite に x86_64 の背が無いため (ADR-KITE-0006)。
 - `niuv wasm` の `--llvm` と `--sysroot` の既定 (ADR-NIUV-0003 の NIV-39) を OS ごとに分けた。macOS は Homebrew の `llvm` と `wasi-sysroot`、ほかは `/usr/bin` と `/usr/share/wasi-sysroot` (Arch の `clang`・`wasi-libc`)。見つからなければ、これまでどおり場所を名指しして断る。
+
+## 訂正 (2026-11-11)
+
+- 受け入れの試験の対象を変えた。この ADR の事実（K1・K4-3 の `fukai/agent` の試験 32 件、旧い道との照らし合わせ、網を断ったホストでの `niuv build fukai-agent`）は、その時のもので、書き換えない。`fukai/agent`、`fukai/store` の Gleam パッケージ、`fukai/database/gleam/fukai_column` は Nim に移して消えた（fukai の決定 147）ので、NIV-17（全 `.beam` の SHA-256 が場所によらず一致）と NIV-20 の一部（GPL の依存の拒み）を実物の閉包で確かめていた `tests/acceptance/test_fukai_agent.nim` は動かせなくなった（`buildGleam` の引数の変更にも追いついておらず、その前から古くなっていた）[測った: 旧い試験は `buildGleam` の型が合わず組めなかった]。
+- 新しい対象は `tests/acceptance/test_gleam_closure_places.nim`。残った `foundation/gl-*`（代表の決定 2026-11-07）の閉包: `gl-upgrade-coordinator`（gleam.toml で `gl-hotswap` に path で依存）、Erlang の FFI を持つ `gl-port`・`gl-unix-frames`、`gl-cbor-det`、`gl-mfa-supervisor`、Hex の `gleam_stdlib`・`gleam_erlang`。5 つを全部必要とする実物のパッケージは無いので、試験が根の 1 つ（`gl-closure`）だけを作る。それ以外は実物。旧い試験と同じ 3 つ（パッケージ間の依存、Erlang の FFI、Hex のパッケージ）を覆い、形も同じ（深さの違う 2 か所に写して、全 `.beam` を比べる）。
+- 数の下限は 50 から 40 にした（この閉包の `.beam` は 43 個。一致の確かめは数に依らない）。ADR の本文の数（旧い閉包の 53・54 個）はそのまま。
+

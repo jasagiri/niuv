@@ -16,7 +16,7 @@ Nim・Gleam・WASM のビルドの道具。規則の正本は `docs/adr/ADR-NIUV
 mise exec nim@2.2.12 -- nim c -r --opt:speed --hints:off -o:build/t tests/unit/test_decl.nim   # 1 ファイル
 mise exec nim@2.2.12 -- nim c -r --opt:speed --hints:off -o:build/test_all tests/test_all.nim   # 全部（数分）
 mise exec nim@2.2.12 -- nim check --hints:off tests/test_all.nim                               # 警告 0 の確認
-mise exec nim@2.2.12 -- nim c -r --opt:speed --hints:off -o:build/acc tests/acceptance/test_fukai_agent.nim  # 実物の fukai/agent（兄弟リポジトリを読む）
+mise exec nim@2.2.12 -- nim c -r --opt:speed --hints:off -o:build/acc tests/acceptance/test_gleam_closure_places.nim  # 実物の gl-* の閉包（兄弟リポジトリの foundation を読む）
 ```
 
 - テストは `std/unittest`、suite 名に規則 ID（`NIV-05 dependencies`）、test 名は Given-When-Then
