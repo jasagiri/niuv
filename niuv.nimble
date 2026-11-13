@@ -17,4 +17,4 @@ requires "checksums >= 0.2.1"
 # repository.
 
 task test, "Run the tests":
-  exec "nim c -r --opt:speed --hints:off -o:build/test_all tests/test_all.nim"
+  exec "nim c -r --opt:speed --hints:off tests/test_all.nim"
