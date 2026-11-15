@@ -26,6 +26,7 @@ commands:
                               [--component-type WIT]...  more WIT for the command's imports (wasip3 only)
                             [--out DIR] [--name NAME] [--stage DIR] [--nim-flag F]... [--no-simd] [--aot]
                             [--llvm DIR] [--sysroot DIR] [--stack-size BYTES]  (default 8 MiB; 64 KiB..64 MiB)
+                              (--sysroot defaults to NIUV_WASI_SYSROOT when it is set, then to the system's)
                             [--component WIT-DIR --world PKG/WORLD --export NAME...]  a component of a WIT world
                               [--wasi [--adapter FILE]]  the core is a WASI reactor, wrapped with the preview1
                               reactor adapter (default: nim-wasip1-adapter's build/reactor next to niuv)
@@ -51,6 +52,14 @@ type
   Parsed = object
     positional: seq[string]
     opts: Table[string, seq[string]]
+
+
+proc defaultWasiSysroot(): string {.raises: [].} =
+  ## Where the wasi-sysroot is when `--sysroot` is not given: `NIUV_WASI_SYSROOT`, then the
+  ## system's place. A machine whose system sysroot lacks a target can point at another
+  ## one without every caller of niuv passing the option.
+  let given = getEnv("NIUV_WASI_SYSROOT")
+  if given.len > 0: given else: DefaultWasiSysroot
 
 proc fail(msg: string, code = 1): CliResult {.raises: [].} =
   CliResult(code: code, stderr: "niuv: " & msg & "\n")
@@ -236,7 +245,7 @@ proc cmdBuild(args: seq[string]): CliResult {.raises: [].} =
     sbomPath = r.get.outcome.sbomPath
   else:
     let r = buildPackage(ws.get, package, outDir, stageRoot, p.get.opts.getOrDefault("--bin"), m.target, m.inGuest,
-                          lastOpt("--llvm", DefaultLlvmBin), lastOpt("--sysroot", DefaultWasiSysroot))
+                          lastOpt("--llvm", DefaultLlvmBin), lastOpt("--sysroot", defaultWasiSysroot()))
     if r.isErr: return fail($r.error)
     artifacts = r.get.artifacts
     notes = r.get.notes
@@ -306,7 +315,7 @@ proc cmdWasm(args: seq[string]): CliResult {.raises: [].} =
       return usageFail("--stack-size takes a number of bytes")
     if not stackSizeValid(stackSize):
       return usageFail("--stack-size takes 65536 to 67108864 bytes, a multiple of 16")
-  let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", DefaultWasiSysroot), aot, component,
+  let tc = findWasmToolchain(last("--llvm", DefaultLlvmBin), last("--sysroot", defaultWasiSysroot()), aot, component,
                              target)
   if tc.isErr: return fail($tc.error)
   let req = WasmRequest(program: program, outDir: outDir, name: name,

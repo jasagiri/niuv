@@ -49,3 +49,7 @@
 
 - 一部を ADR-NIUV-0008 で改めた: `niuv wasm` は `--target wasm32-wasip3` で WASI 0.3 の command の component も組む (NIV-58〜62)。`--target` の既定は `wasm32-wasip1` で、この ADR の規則はそのまま。NIV-38 の「`lib/wasm32-wasip1` が無い」は、選んだ対象の `lib/<target>` で確かめる形になった。NIV-39 の `--out` の既定は `build/<target>`。
 - NIV-35 の `start.c`: 0 でない `programResult` を `return` ではなく `exit()` で返す形に改めた (ADR-NIUV-0008 の NIV-58)。wasip1 の `_start` は main の戻り値で同じ `exit` を呼ぶので、wasip1 の終了コードは変わらない (NIV-35 の E テストで確かめた)。
+
+## 訂正 (2026-11-15)
+
+- NIV-39 の `--sysroot` の既定: `--sysroot` が無いとき、環境変数 `NIUV_WASI_SYSROOT` が空でなければそれを使い、無ければこれまでどおり OS ごとの場所を使う (`niuv wasm` と `niuv build` の両方)。`--sysroot` を書けばそちらが勝つ。理由: 配布物の wasi-libc が選んだ対象 (`lib/wasm32-wasip3`) を持たない機械 (Arch の `wasi-libc`) では、別の場所に置いた sysroot を使うしかないが、niuv を呼ぶ側 (nim-wasm-runtime の `script` など) は `--sysroot` を渡さない。呼ぶ側の全部に旗を足す代わりに、機械の事情を機械の環境に書けるようにした。`--llvm` には足していない (要る機械がまだ無い)。E テストは `tests/unit/test_wasmbuild.nim` の「NIUV_WASI_SYSROOT」の 2 件。

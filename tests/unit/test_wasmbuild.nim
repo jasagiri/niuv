@@ -5,7 +5,7 @@
 ## (not skip) when one is missing.
 
 import std/[algorithm, options, os, osproc, sequtils, strutils, unittest]
-import ../../src/niuv/[artifact, cli, errors, hashing, lock, manifest, workspace]
+import ../../src/niuv/[artifact, cli, errors, hashing, lock, manifest, wasm, workspace]
 import support
 
 const testFile* = "tests/unit/test_wasmbuild.nim"
@@ -127,6 +127,24 @@ suite "NIV-52 the WASM tools are looked for before any compiler runs":
     let r = buildApp(d, w, @["--sysroot", d])
     check r.code != 0
     check "wasi-sysroot" in r.stderr
+
+  test "Given NIUV_WASI_SYSROOT naming a directory that is not a wasi-sysroot and no --sysroot, When built, Then it is refused naming that directory":
+    let d = freshDir("wb-envsysroot")
+    let w = makeWorkspace(d, component("probe"))
+    locked(w)
+    putEnv("NIUV_WASI_SYSROOT", d)
+    defer: delEnv("NIUV_WASI_SYSROOT")
+    let r = buildApp(d, w)
+    check r.code != 0
+    check d in r.stderr
+
+  test "Given NIUV_WASI_SYSROOT naming a directory that is not a wasi-sysroot, When built with --sysroot, Then the option is used":
+    let d = freshDir("wb-envsysroot-option")
+    let w = makeWorkspace(d, component("probe"))
+    locked(w)
+    putEnv("NIUV_WASI_SYSROOT", d)
+    defer: delEnv("NIUV_WASI_SYSROOT")
+    check buildApp(d, w, @["--sysroot", DefaultWasiSysroot]).code == 0
 
   test "Given no wasm-tools on PATH, When built, Then it is refused naming wasm-tools":
     let d = freshDir("wb-nowasmtools")
