@@ -46,6 +46,10 @@ const
   StartSource = staticRead("wasm/start.c")
   ReactorSource = staticRead("wasm/reactor.c")
   Multi3Source = staticRead("wasm/multi3.c")
+  FreestandingSource = staticRead("wasm/freestanding.h")
+  NimSystemC* = "@psystem.nim.c"
+    ## The C file Nim makes of its system module. A freestanding component's
+    ## system module is compiled with freestanding.h (NIV-41).
   CompilerRtCandidates* = [
     "lib/wasm32-unknown-wasip1/libclang_rt.builtins.a",
     "lib/wasip1/libclang_rt.builtins-wasm32.a",
@@ -120,6 +124,12 @@ proc nimCArgs*(tc: WasmToolchain, simd: bool, nimLib, cFile, oFile: string): seq
   ## level Nim's C for wasm32 gives no warning (NIV-34), so any warning is new
   ## and fails the build rather than vanishing into a log nobody reads.
   targetCFlags(tc.sysroot, simd, tc.target) & @["-Werror", "-I" & nimLib, "-c", cFile, "-o", oFile]
+
+proc freestandingSystemArgs*(args: seq[string], header: string): seq[string] {.raises: [].} =
+  ## The clang arguments of Nim's system module in a freestanding component:
+  ## `args` with freestanding.h included first, so its fatal paths trap
+  ## instead of reaching wasi-libc's stdio and exit (NIV-41).
+  @["-include", header] & args
 
 proc ownCArgs*(tc: WasmToolchain, simd: bool, cFile, oFile: string): seq[string] {.raises: [].} =
   targetCFlags(tc.sysroot, simd, tc.target) & @["-Wall", "-Wextra", "-Werror", "-c", cFile, "-o", oFile]
@@ -326,16 +336,27 @@ proc buildWasm*(tc: WasmToolchain, req: WasmRequest): NResult[WasmOutput] {.rais
     return err(niuvError(ekIo, req.stageDir & ": " & e.msg))
   let nimLib = ?nimLibDir(tc, req.program)
   ?runStep(tc.nim, nimArgs(req, cDir), "nim for " & req.program)
+  let freestanding = req.shape == wsComponent and req.adapter.len == 0
+  let header = req.stageDir / "freestanding.h"
+  if freestanding: ?writeSource(header, FreestandingSource)
   var jobs: seq[seq[string]]
   var objects: seq[string]
+  var sawSystem = false
   try:
     for kind, c in walkDir(cDir):
       if kind == pcFile and c.endsWith(".c"):
         let o = oDir / (c.extractFilename.changeFileExt("") & ".o")
-        jobs.add nimCArgs(tc, req.simd, nimLib, c, o)
+        var args = nimCArgs(tc, req.simd, nimLib, c, o)
+        if freestanding and c.extractFilename == NimSystemC:
+          args = freestandingSystemArgs(args, header)
+          sawSystem = true
+        jobs.add args
         objects.add o
   except CatchableError as e:
     return err(niuvError(ekIo, cDir & ": " & e.msg))
+  if freestanding and not sawSystem:
+    return err(niuvError(ekBuild, "Nim made no " & NimSystemC & " in " & cDir & ": niuv cannot keep the system " &
+                         "module's stdio and exit out of the freestanding core (NIV-41)"))
   ?runAll(tc.clang, jobs, req.stageDir / "log")
   var output = WasmOutput()
   if req.shape == wsCommand:

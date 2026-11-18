@@ -48,3 +48,11 @@ stack の大きさ（2026-11-05 に足した。nim-actor-guest の報告: 8 MiB 
 ## 訂正 (2026-11-06)
 
 - 手順を呼ぶのは `niuv wasm` だけではなくなった。`niuv build` が、`niuv.toml` の `[[wasm.component]]` を同じ `buildWasm` で組む（ADR-NIUV-0007、NIV-49〜57）。NIV-40〜43、48 の規則は変えない。
+
+## 訂正 (2026-11-18) — Nim 2.2.12 からの system モジュールの stdio と exit
+
+- 事実: Nim 2.2.12 から、`-d:useMalloc` と `--os:standalone` の system モジュールは、割り当ての失敗 (`raiseOutOfMem`) と長さの溢れ (`nimSizeOverflow`、2.4 から) で、stderr へ `fwrite`・`fflush` で 1 行書いて `exit` を呼ぶ。2.2.8 は zephyr のときしか呼ばない。これが wasi-libc の stdio と exit を core に引き入れ、wasi_snapshot_preview1 の `clock_time_get`・`fd_write`・`fd_seek`・`fd_close`・`proc_exit` の import が生じて NIV-41 が破れていた [見た: 2026-11-18、Nim 2.4.2 で `tests/unit/test_wasm.nim` の NIV-41 と NIV-43 が落ち、foundation/nim-actor-guest の `build-actor.sh` で services/engi-ichinyo の actor が `component new` に断られた。2.2.8 を PATH の先に置くと通った]。
+- NIV-41 を守る手順を足す: freestanding の形 (`--adapter` の無い `--component`) では、niuv は Nim の system モジュールの C (`@psystem.nim.c`) だけを、niuv の `src/niuv/wasm/freestanding.h` を `-include` して翻訳する。この header は、その翻訳単位の中の `fwrite`・`fflush`・`exit` を trap に、`stderr` を空のポインタに置き換える。freestanding の core には書く先も終わる過程も無く、panic は trap する (NIV-42) ので、2 つの致命の道も trap にそろえる。Nim が `@psystem.nim.c` を作らなければ、黙って進めずに断る。
+- 置き換えは system モジュールに限る。ゲストが自分で stdio を呼べば、今までどおり `wasm-tools component new` が断る (NIV-42)。リンク全体に `fwrite` などを定義する案は、この断りを黙った trap に変えるので採らなかった。
+- 確かめ: `tests/unit/test_wasm.nim` の NIV-41 (system モジュールの引数、長さが溢れるゲストの core に import が無く呼ぶと trap する) と NIV-42 (stderr に自分で書くゲストは断られる)。
+- Future: Nim の standalone の `raiseOutOfMem` と `nimSizeOverflow` が panicoverride の panic を通るようになったら、header を外す。

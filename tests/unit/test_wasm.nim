@@ -297,6 +297,25 @@ suite "NIV-41 a component of a world":
     check code == 0
     check o.strip() == "21"
 
+  test "Given a freestanding component, When Nim's system module is compiled, Then freestanding.h is included first and other modules are compiled as before":
+    let plain = nimCArgs(componentToolchain(), false, "/lib", "/c/" & NimSystemC, "/o/s.o")
+    let system = freestandingSystemArgs(plain, "/s/freestanding.h")
+    check system[0 .. 1] == @["-include", "/s/freestanding.h"]
+    check system[2 .. ^1] == plain
+
+  test "Given a guest whose seq cannot be measured (Nim's size overflow, which writes to stderr and exits), When built, Then the core imports nothing and the call traps":
+    let d = probeDir("wasm-component-overflow", guest = "var wanted = high(int) div 4\n" &
+      "proc run(): uint32 {.exportc: \"run\", cdecl.} =\n  var s = newSeq[uint64](wanted)\n  uint32(s.len)\n")
+    let built = buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d))
+    check built.isOk
+    if built.isOk:
+      let (printed, pcode) = execCmdEx("wasm-tools print " & quoteShell(built.get.wasm))
+      check pcode == 0
+      check "(import" notin printed
+      let (o, code) = execCmdEx("wasmtime run --invoke 'run()' " & quoteShell(built.get.component))
+      check code != 0
+      check "unreachable" in o
+
 suite "NIV-42 component refusals":
   test "Given no panicoverride.nim next to the program, When built, Then it is refused before nim runs and says the panic should trap":
     let d = probeDir("wasm-component-nopanic", panicOverride = false)
@@ -316,6 +335,18 @@ suite "NIV-42 component refusals":
     check r.isErr
     check r.error.kind == ekBuild
     check "absent" in r.error.msg
+
+  test "Given a guest that writes to stderr itself, When built, Then it is refused as before: only Nim's system module traps instead":
+    let d = probeDir("wasm-component-stderr", guest = "{.emit: \"#include <stdio.h>\".}\n" &
+      "var cerr {.importc: \"stderr\", nodecl.}: pointer\n" &
+      "proc fputs(s: cstring, f: pointer): cint {.importc, nodecl.}\n" &
+      "proc run(): uint32 {.exportc: \"run\", cdecl.} =\n  discard fputs(\"x\", cerr)\n  7\n")
+    let r = buildWasm(componentToolchain(), componentRequest(d / "prog" / "main.nim", d))
+    check r.isErr
+    if r.isErr:
+      check r.error.kind == ekBuild
+      check "wasm-tools component" in r.error.msg
+      check "wasi" in r.error.msg
 
   test "Given a guest that calls into WASI, When built, Then wasm-tools refuses the core module and the reason is passed on":
     let d = probeDir("wasm-component-wasi", guest = "{.emit: \"#include <stdio.h>\".}\n" &
